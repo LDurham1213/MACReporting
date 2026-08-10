@@ -1,3 +1,16 @@
+## MACReporting
+
+MACReporting is a 3-tier Python web application for creating and managing
+chapter report templates and their associated questions.
+
+The application uses a one-to-many relationship where one Report Template
+can contain many Questions, and each Question belongs to one Report Template.
+
+### Project Documentation
+
+See [Project_Plan.md](Project_Plan.md) for the MACReporting project plan,
+scope, technology stack, and development phases.
+
 # OnesToManys (ListDetails)
 
 The point of this project is to explore what a 3-tier web application is like.
