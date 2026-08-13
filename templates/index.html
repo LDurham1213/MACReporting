@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="/static/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MACReporting</title>
+</head>
+<body>
+
+    <div class="page-container">
+
+        <header class="page-header">
+            <h1>MACReporting</h1>
+            <p>Manage report templates and their associated questions.</p>
+        </header>
+
+
+        <section class="panel">
+            <h2>Add / Edit Report Template</h2>
+
+            <form id="template-form" class="form-grid">
+
+                <div class="form-group">
+                    <label for="template-name">Name</label>
+                    <input type="text" id="template-name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="template-description">Description</label>
+                    <input type="text" id="template-description">
+                </div>
+
+                <button type="submit" id="template-submit-button" class="primary-button">
+                    Add Template
+                </button>
+
+            </form>
+        </section>
+
+
+        <section class="panel">
+            <h2>Report Templates</h2>
+
+            <div id="report-templates" class="card-list">
+                Loading report templates...
+            </div>
+        </section>
+
+
+        <section class="panel">
+            <h2 id="questions-title">Questions</h2>
+
+            <div id="questions" class="card-list">
+                Select a report template to view its questions.
+            </div>
+        </section>
+
+
+        <section class="panel">
+            <h2 id="question-form-title">Add / Edit Question</h2>
+
+            <form id="question-form" class="form-grid">
+
+                <div class="form-group">
+                    <label for="question-template-id">Report Template ID</label>
+                    <input type="number" id="question-template-id" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="question-section">Section Name</label>
+                    <input type="text" id="question-section">
+                </div>
+
+                <div class="form-group">
+                    <label for="question-text">Question</label>
+                    <input type="text" id="question-text" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="question-type">Question Type</label>
+                    <input type="text" id="question-type" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="question-required">Required</label>
+                    <input type="number" id="question-required" value="0">
+                </div>
+
+                <div class="form-group">
+                    <label for="question-order">Display Order</label>
+                    <input type="number" id="question-order">
+                </div>
+
+                <button type="submit" id="question-submit-button" class="primary-button">
+                    Add Question
+                </button>
+
+            </form>
+        </section>
+
+    </div>
+
+    <script src="/static/app.js"></script>
+
+</body>
+</html>

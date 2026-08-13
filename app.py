@@ -1,12 +1,17 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
+from flask_cors import CORS
 import sqlite3
 import json
 from pathlib import Path
 
 app = Flask(__name__)
+CORS(app)
 
 DATABASE = "database/macreporting.db"
 
+@app.route("/")
+def home():
+    return render_template("index.html")
 
 def get_db_connection():
     connection = sqlite3.connect(DATABASE)

@@ -1,0 +1,102 @@
+body {
+    margin: 0;
+    font-family: Georgia, 'Times New Roman', Times, serif, sans-serif;
+    background: #7c0a02;
+}
+
+.page-container {
+    width: 90%;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 30px 0;
+}
+
+.page-header {
+    margin-bottom: 30px;
+}
+
+.page-header h1 {
+    margin-bottom: 5px;
+    font-size: 65px;
+    text-align: center;
+    color: #fffdd0;
+}
+
+.page-header p {
+    margin-top: 0;
+    font-size: 30px;
+    text-align: center;
+    color: #fffdd0;
+}
+
+.panel {
+    background: #fffdd0;
+    padding: 24px;
+    margin-bottom: 24px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.form-grid {
+    display: grid;
+    gap: 16px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    margin-bottom: 6px;
+    font-weight: bold;
+}
+
+.form-group input {
+    padding: 10px;
+    font-size: 16px;
+}
+
+button {
+    padding: 9px 14px;
+    cursor: pointer;
+    margin-right: 8px;
+}
+
+.card-list > div {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 14px;
+}
+
+.button-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.button-row button {
+    margin-right: 0;
+}
+
+.question-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+}
+
+.question-row p {
+    margin: 0;
+    flex: 1;
+}
+
+.primary-button {
+    font-size: 14px;
+    font-weight: bold;
+    padding: 7px 12px;
+    width: fit-content;
+    justify-self: start;
+    font-family: Georgia, 'Times New Roman', Times, serif
+}

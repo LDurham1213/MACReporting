@@ -1,17 +1,280 @@
-## MACReporting
+# MACReporting
 
 MACReporting is a 3-tier Python web application for creating and managing
 chapter report templates and their associated questions.
 
-The application uses a one-to-many relationship where one Report Template
-can contain many Questions, and each Question belongs to one Report Template.
+The application uses a one-to-many relationship where one **Report Template**
+can contain many **Questions**, and each Question belongs to one Report Template.
 
-### Project Documentation
+MACReporting was inspired by an existing reporting process using Google Forms
+and Google Apps Script. This project begins the process of moving that workflow
+into a standalone reporting application.
 
-See [Project_Plan.md](Project_Plan.md) for the MACReporting project plan,
-scope, technology stack, and development phases.
+---
 
-# OnesToManys (ListDetails)
+## Project Documentation
+
+For detailed project requirements, development phases, database design,
+implementation details, and future development plans, see
+[Project_Plan.md](Project_Plan.md).
+
+---
+
+## MACReporting One-to-Many Relationship
+
+For this implementation of the ListDetails project:
+
+- **Master:** Report Template
+- **Detail:** Question
+
+The relationship is:
+
+**Report Template (1) → Questions (Many)**
+
+Each Question contains a `report_template_id` that associates it with a
+specific Report Template.
+
+Example:
+
+```text
+Committee Report
+    ├── Question 1
+    ├── Question 2
+    └── Question 3
+
+Post-Mortem Report
+    ├── Question 1
+    ├── Question 2
+    └── Question 3
+```
+
+---
+
+## Technology Stack
+
+### Backend
+
+- Python
+- Flask
+- Flask-CORS
+- SQLite
+- SQL
+- REST API
+- JSON
+
+### Frontend
+
+- HTML
+- CSS
+- Vanilla JavaScript
+- React
+- Vite
+
+### Development and Testing
+
+- curl
+- Postman
+- Node.js
+- npm
+- Git
+- GitHub
+
+---
+
+## Application Architecture
+
+MACReporting uses a 3-tier architecture:
+
+```text
+Frontend
+   ↓
+Flask REST API
+   ↓
+SQLite Database
+```
+
+Two frontend implementations were created:
+
+```text
+                  Flask REST API
+                       ↓
+                    SQLite
+                   ↗       ↖
+                  /         \
+       Vanilla JavaScript   React
+            Frontend        Frontend
+```
+
+Both frontends communicate with the same Flask REST API and SQLite database.
+
+---
+
+## Features Completed
+
+### Report Templates
+
+- Create Report Templates
+- View Report Templates
+- Edit Report Templates
+- Delete Report Templates
+
+### Questions
+
+- Create Questions
+- View Questions
+- Edit Questions
+- Delete Questions
+
+### One-to-Many Relationship
+
+- Select a Report Template
+- Retrieve Questions associated with that Report Template
+- Display the related Questions dynamically
+
+### Additional Features
+
+- JSON data import
+- JSON data export
+- Vanilla JavaScript frontend
+- React frontend
+
+The CRUD interface for Report Templates and Questions was created to meet the
+requirements of this project.
+
+In a future production version of MACReporting, Report Template and Question
+management would primarily be administrative functionality. A typical user
+would select a Report Type, answer the associated Questions, and submit the
+completed report.
+
+---
+
+## REST API
+
+### Report Templates
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| GET | `/report-templates` | Retrieve all Report Templates |
+| POST | `/report-templates` | Create a Report Template |
+| PUT | `/report-templates/<template_id>` | Update a Report Template |
+| DELETE | `/report-templates/<template_id>` | Delete a Report Template |
+
+### Questions
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| GET | `/questions` | Retrieve all Questions |
+| POST | `/questions` | Create a Question |
+| PUT | `/questions/<question_id>` | Update a Question |
+| DELETE | `/questions/<question_id>` | Delete a Question |
+
+### One-to-Many Relationship
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| GET | `/report-templates/<template_id>/questions` | Retrieve Questions for a selected Report Template |
+
+### Import / Export
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| GET | `/export` | Export application data |
+| POST | `/import` | Import application data |
+
+---
+
+## Frontends
+
+### Vanilla JavaScript
+
+The primary frontend uses HTML, CSS, and Vanilla JavaScript and provides full
+CRUD functionality for Report Templates and Questions.
+
+It also allows a user to select a Report Template and dynamically view the
+Questions associated with that template.
+
+### React
+
+A second frontend was created using React and Vite.
+
+The React frontend demonstrates:
+
+- Retrieving data from the Flask REST API
+- React components
+- Props
+- State
+- `useEffect`
+- API requests using `fetch()`
+- Dynamic rendering
+- Displaying Questions associated with a selected Report Template
+
+The React frontend uses the same Flask REST API and SQLite database as the
+Vanilla JavaScript frontend.
+
+---
+
+## Running the Application
+
+### Flask / Vanilla JavaScript Frontend
+
+From the main MACReporting directory, start the Flask application using the
+Flask command used by the project.
+
+The application is available at:
+
+```text
+http://127.0.0.1:5000
+```
+
+### React Frontend
+
+The Flask server must be running for React to access the REST API.
+
+Open a second terminal:
+
+```bash
+cd react-frontend
+```
+
+Install dependencies if they have not already been installed:
+
+```bash
+npm install
+```
+
+Start the Vite development server:
+
+```bash
+npm run dev
+```
+
+The React frontend is available at:
+
+```text
+http://localhost:5173
+```
+
+During development:
+
+```text
+Flask / Vanilla JavaScript → Port 5000
+React / Vite               → Port 5173
+```
+
+---
+
+## Project Status
+
+**Phases 1, 2, and 3 are complete.**
+
+Detailed information about the implementation of each phase can be found in
+[Project_Plan.md](Project_Plan.md).
+
+---
+
+# Original One-to-Many Project Instructions
+
+## OnesToManys (ListDetails)
 
 The point of this project is to explore what a 3-tier web application is like.
 You can implment it in either Java (and Java frameworks) or Python (and Python frameworks).
@@ -51,20 +314,28 @@ It has three phases.
 ### Overall ListDetails Stacks
 
 A basic SQL lab: tables, schema, selects, and crud in SQL repl; simple API access
-Java: ListDetail phase 1,2 REST/DB app https://spring.io/guides/gs/accessing-data-rest Spring; Data: ListDetail phase 1,2 REST/DB app (fastapi, flask, sqlite3
+
+Java: ListDetail phase 1,2 REST/DB app  
+https://spring.io/guides/gs/accessing-data-rest
+
+Spring; Data: ListDetail phase 1,2 REST/DB app  
+(fastapi, flask, sqlite3)
+
 https://zcw.guru/kristofer/ae5cb89250b14a6da2903a9cc613390b
+
+---
 
 ## Understanding Master-Detail Relationships in Data Modeling
 
+### What is a Master-Detail Relationship?
 
-## What is a Master-Detail Relationship?
-
-A master-detail relationship (sometimes called parent-child relationship) is a fundamental data modeling concept where:
+A master-detail relationship (sometimes called parent-child relationship) is a
+fundamental data modeling concept where:
 
 - **Master (Parent) Entity**: Contains primary information and can exist independently
 - **Detail (Child) Entity**: Contains secondary information that depends on the master entity and cannot exist without it
 
-## Why Master-Detail Relationships Matter
+### Why Master-Detail Relationships Matter
 
 Understanding master-detail relationships is crucial for several reasons:
 
@@ -74,37 +345,45 @@ Understanding master-detail relationships is crucial for several reasons:
 4. **Optimized Queries**: Allows for more efficient database operations
 5. **Scalable Application Design**: Creates maintainable, extensible software architecture
 
+---
+
 ## Real-World Examples Across Domains
 
 ### E-Commerce
+
 - **Master**: Order
 - **Detail**: Order Items
 
 An order can contain multiple items, but each order item belongs to exactly one order.
 
 ### Finance
+
 - **Master**: Invoice
 - **Detail**: Line Items
 
 An invoice contains multiple line items, but each line item is associated with exactly one invoice.
 
 ### Healthcare
+
 - **Master**: Patient
 - **Detail**: Medical Records
 
 A patient has multiple medical records, but each record belongs to one patient.
 
 ### Education
+
 - **Master**: Course
 - **Detail**: Lectures/Assignments
 
 A course consists of multiple lectures and assignments, but each lecture/assignment belongs to one course.
 
+---
+
 ## Database Implementation
 
 In relational databases, master-detail relationships are typically implemented using foreign keys:
 
-```/dev/null/example-schema.sql#L1-10
+```sql
 CREATE TABLE orders (
     order_id INT PRIMARY KEY,
     customer_id INT,
@@ -119,11 +398,13 @@ CREATE TABLE order_items (
 );
 ```
 
+---
+
 ## Implementing in Java and Python
 
 ### Java Example (Spring Boot)
 
-```/dev/null/Order.java#L1-15
+```java
 @Entity
 public class Order {
     @Id
@@ -139,7 +420,7 @@ public class Order {
 }
 ```
 
-```/dev/null/OrderItem.java#L1-15
+```java
 @Entity
 public class OrderItem {
     @Id
@@ -159,7 +440,7 @@ public class OrderItem {
 
 ### Python Example (SQLAlchemy)
 
-```/dev/null/models.py#L1-20
+```python
 from sqlalchemy import Column, Integer, String, ForeignKey, Date
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -181,11 +462,14 @@ class OrderItem(Base):
     order = relationship("Order", back_populates="items")
 ```
 
+---
+
 ## REST API Design for Master-Detail
 
-A well-designed REST API should reflect the master-detail relationship in its endpoints:
+A well-designed REST API should reflect the master-detail relationship in its endpoints.
 
 ### Resource Structure
+
 - `/orders` - Get all orders
 - `/orders/{id}` - Get a specific order
 - `/orders/{id}/items` - Get all items for a specific order
@@ -193,7 +477,7 @@ A well-designed REST API should reflect the master-detail relationship in its en
 
 ### Java Example (Spring Boot)
 
-```/dev/null/OrderController.java#L1-22
+```java
 @RestController
 @RequestMapping("/api/orders")
 public class OrderController {
@@ -220,7 +504,7 @@ public class OrderController {
 
 ### Python Example (Flask)
 
-```/dev/null/app.py#L1-25
+```python
 from flask import Flask, jsonify
 from models import Order, OrderItem
 from database import db_session
@@ -247,6 +531,8 @@ def get_order_items(order_id):
     return jsonify([{'id': item.id, 'product_name': item.product_name} for item in order.items])
 ```
 
+---
+
 ## Administration Best Practices
 
 1. **Cascade Operations**: Properly configure delete/update cascades
@@ -256,24 +542,37 @@ def get_order_items(order_id):
 5. **Pagination**: Implement pagination for large detail collections
 6. **Caching**: Consider caching frequently accessed master records
 
+---
+
 ## Conclusion
 
-Master-detail relationships are the backbone of effective data modeling and application development. Understanding these relationships enables beginners to:
+Master-detail relationships are the backbone of effective data modeling and
+application development. Understanding these relationships enables beginners to:
 
 1. Design intuitive and efficient data models
 2. Create scalable database schemas
 3. Develop user-friendly applications
 4. Build RESTful APIs that accurately represent business domains
 
-As you progress in your Java or Python development journey, mastering this concept will significantly enhance your ability to model real-world problems and create robust solutions. Whether you're building a simple to-do app or an enterprise-grade system, the master-detail pattern will be a constant companion in your development toolkit.
+As you progress in your Java or Python development journey, mastering this
+concept will significantly enhance your ability to model real-world problems
+and create robust solutions. Whether you're building a simple to-do app or an
+enterprise-grade system, the master-detail pattern will be a constant companion
+in your development toolkit.
+
+---
 
 ## But wait...DTO?
 
-What's a DTO? Why? https://zcw.guru/kristofer/dtointro
+What's a DTO? Why?
 
-## Possible project relations
+https://zcw.guru/kristofer/dtointro
 
-These are some possible projrct relations for your ListDetail app.
+---
+
+## Possible Project Relations
+
+These are some possible project relations for your ListDetail app.
 You can also propose your own project relations, but it must be approved by an
 instructor.
 
