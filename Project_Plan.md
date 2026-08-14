@@ -382,3 +382,597 @@ Possible future enhancements include:
 
 These features are outside the scope of the current project and represent
 possible future development of MACReporting.
+# -----------------------------------------------------------------------
+# How to Run MACReporting
+# -----------------------------------------------------------------------
+
+This section explains how to start and use MACReporting.
+
+MACReporting currently has **two web interfaces**:
+
+1. **Vanilla JavaScript Version**
+   Runs through Flask and is available at:
+
+   `http://127.0.0.1:5000`
+
+2. **React Version**
+   Runs through Vite and is available at:
+
+   `http://localhost:5173`
+
+Both versions use the same Flask REST API and SQLite database.
+
+---
+
+## Before You Begin
+
+Open the MACReporting project in **Visual Studio Code (VS Code)**.
+
+The main project folder should look similar to this:
+
+```text
+MACReporting/
+│
+├── app.py
+├── database/
+├── static/
+├── templates/
+├── react-frontend/
+├── Project_Plan.md
+└── README.md
+```
+
+The most important thing is that you begin in the main:
+
+```text
+MACReporting
+```
+
+folder.
+
+---
+
+# Part 1 - Running the Vanilla JavaScript Version
+
+The Vanilla JavaScript version only requires the Flask server.
+
+## Step 1 - Open a Terminal
+
+In VS Code, select:
+
+**Terminal → New Terminal**
+
+A terminal window will open at the bottom of the screen.
+
+Make sure the terminal is inside the main MACReporting project folder.
+
+The prompt should end with something similar to:
+
+```text
+MACReporting %
+```
+
+---
+
+## Step 2 - Start the Flask Server
+
+In the terminal, enter:
+
+```bash
+python3 app.py
+```
+
+Press **Enter**.
+
+If Flask starts correctly, the terminal should display information that includes:
+
+```text
+http://127.0.0.1:5000
+```
+
+### Important
+
+Leave this terminal open.
+
+The terminal is running the Flask server. If the terminal is closed or the server is stopped, the application will no longer be available.
+
+---
+
+## Step 3 - Open MACReporting
+
+Open a web browser such as:
+
+* Chrome
+* Safari
+* Edge
+* Firefox
+
+Enter the following address:
+
+```text
+http://127.0.0.1:5000
+```
+
+The MACReporting Vanilla JavaScript application should appear.
+
+---
+
+## What You Can Do in the Vanilla JavaScript Version
+
+The current application allows you to:
+
+* View Report Templates
+* Add Report Templates
+* Edit Report Templates
+* Delete Report Templates
+* View Questions associated with a Report Template
+* Add Questions
+* Edit Questions
+* Delete Questions
+
+The Template and Question management features are included to demonstrate CRUD functionality for this project.
+
+In a future production version of MACReporting, these functions would most likely be available only to an administrator.
+
+---
+
+# Part 2 - Running the React Version
+
+The React version requires **two servers to run at the same time**.
+
+The first server runs Flask.
+
+The second server runs React using Vite.
+
+Think of the setup like this:
+
+```text
+React Web Page
+      ↓
+Flask REST API
+      ↓
+SQLite Database
+```
+
+React displays the application.
+
+Flask retrieves and updates the data.
+
+SQLite stores the data.
+
+---
+
+## Step 1 - Start Flask
+
+Open a terminal in VS Code.
+
+Make sure the terminal is in the main:
+
+```text
+MACReporting
+```
+
+folder.
+
+Enter:
+
+```bash
+python3 app.py
+```
+
+Press **Enter**.
+
+Flask should start at:
+
+```text
+http://127.0.0.1:5000
+```
+
+### Leave this terminal open.
+
+Do not stop Flask while using the React application.
+
+---
+
+## Step 2 - Open a Second Terminal
+
+In VS Code, select:
+
+**Terminal → New Terminal**
+
+You should now have:
+
+```text
+Terminal 1 → Flask
+Terminal 2 → React
+```
+
+The Flask terminal should remain running.
+
+---
+
+## Step 3 - Move Into the React Folder
+
+In the second terminal, enter:
+
+```bash
+cd react-frontend
+```
+
+Press **Enter**.
+
+The terminal prompt should now indicate that you are inside the React frontend folder.
+
+For example:
+
+```text
+react-frontend %
+```
+
+---
+
+## Step 4 - Install React Packages
+
+This step is usually only required:
+
+* the first time the project is run on a computer
+* after cloning the project from GitHub
+* after React dependencies have changed
+
+Run:
+
+```bash
+npm install
+```
+
+Press **Enter**.
+
+Wait until the installation finishes.
+
+### Note
+
+You do not normally need to run `npm install` every time you start the application.
+
+---
+
+## Step 5 - Start the React Server
+
+In the same terminal, enter:
+
+```bash
+npm run dev
+```
+
+Press **Enter**.
+
+If React/Vite starts successfully, the terminal should display something similar to:
+
+```text
+Local: http://localhost:5173/
+```
+
+### Leave this terminal open.
+
+At this point, you should have two running terminals:
+
+```text
+Terminal 1
+Flask
+http://127.0.0.1:5000
+
+
+Terminal 2
+React / Vite
+http://localhost:5173
+```
+
+---
+
+## Step 6 - Open the React Application
+
+Open a web browser and enter:
+
+```text
+http://localhost:5173
+```
+
+The React version of MACReporting should appear.
+
+---
+
+# Which Web Address Should I Use?
+
+MACReporting currently has two different frontend versions.
+
+| Address                 | Version                    |
+| ----------------------- | -------------------------- |
+| `http://127.0.0.1:5000` | Flask + Vanilla JavaScript |
+| `http://localhost:5173` | React                      |
+
+The two webpages may look different, but they both connect to the same Flask REST API and SQLite database.
+
+---
+
+# Quick Start Guide
+
+## To Run the Vanilla JavaScript Version
+
+Open the MACReporting project in VS Code.
+
+Open a terminal and run:
+
+```bash
+python3 app.py
+```
+
+Then open:
+
+```text
+http://127.0.0.1:5000
+```
+
+---
+
+## To Run the React Version
+
+### Terminal 1
+
+From the main MACReporting folder:
+
+```bash
+python3 app.py
+```
+
+Leave the terminal running.
+
+### Terminal 2
+
+Run:
+
+```bash
+cd react-frontend
+```
+
+Then:
+
+```bash
+npm run dev
+```
+
+Leave this terminal running.
+
+Open:
+
+```text
+http://localhost:5173
+```
+
+---
+
+# First-Time React Setup
+
+If the React project has never been run on the computer before, use:
+
+```bash
+cd react-frontend
+```
+
+Then:
+
+```bash
+npm install
+```
+
+Then:
+
+```bash
+npm run dev
+```
+
+After the first setup, you normally only need:
+
+```bash
+cd react-frontend
+npm run dev
+```
+
+---
+
+# How to Stop MACReporting
+
+To stop a running server:
+
+1. Click the terminal where the server is running.
+2. Press:
+
+```text
+Control + C
+```
+
+For the Vanilla JavaScript version, stop the Flask server.
+
+For the React version, stop:
+
+* the Flask server
+* the React/Vite server
+
+---
+
+# Starting MACReporting Again Later
+
+You do not need to reinstall everything each time.
+
+## Vanilla JavaScript
+
+1. Open MACReporting in VS Code.
+2. Open a terminal.
+3. Run:
+
+```bash
+python3 app.py
+```
+
+4. Open:
+
+```text
+http://127.0.0.1:5000
+```
+
+---
+
+## React
+
+1. Open MACReporting in VS Code.
+2. Open Terminal 1.
+3. Run:
+
+```bash
+python3 app.py
+```
+
+4. Open Terminal 2.
+5. Run:
+
+```bash
+cd react-frontend
+```
+
+6. Run:
+
+```bash
+npm run dev
+```
+
+7. Open:
+
+```text
+http://localhost:5173
+```
+
+---
+
+# Troubleshooting
+
+## Problem: The Webpage Will Not Open
+
+Check the terminal.
+
+If Flask is not running, this address will not work:
+
+```text
+http://127.0.0.1:5000
+```
+
+If React/Vite is not running, this address will not work:
+
+```text
+http://localhost:5173
+```
+
+Restart the appropriate server.
+
+---
+
+## Problem: React Opens but No Report Data Appears
+
+Make sure Flask is also running.
+
+React displays the webpage, but Flask provides the Report Template and Question data.
+
+For React to work correctly, both servers should be active:
+
+```text
+Flask
+http://127.0.0.1:5000
+
+React
+http://localhost:5173
+```
+
+---
+
+## Problem: `npm` Command Not Found
+
+Node.js and npm must be installed to run the React frontend.
+
+Verify that they are installed by running:
+
+```bash
+node --version
+```
+
+Then:
+
+```bash
+npm --version
+```
+
+Both commands should return version numbers.
+
+---
+
+## Problem: `python3 app.py` Does Not Work
+
+Make sure:
+
+1. The terminal is inside the main MACReporting folder.
+2. Python is installed.
+3. The correct Python environment is selected in VS Code.
+4. Flask and Flask-CORS are installed.
+
+---
+
+## Problem: A Change to Flask Is Not Appearing
+
+Stop the Flask server by pressing:
+
+```text
+Control + C
+```
+
+Then restart it:
+
+```bash
+python3 app.py
+```
+
+---
+
+## Problem: A React Change Is Not Appearing
+
+Vite normally updates the React page automatically when a file is saved.
+
+If the change does not appear:
+
+1. Save the file.
+2. Refresh the browser.
+3. Check the React terminal for errors.
+4. Check the browser Developer Console for errors.
+
+---
+
+# Simple Reference
+
+```text
+FLASK / VANILLA JAVASCRIPT
+
+Start:
+python3 app.py
+
+Open:
+http://127.0.0.1:5000
+```
+
+```text
+REACT
+
+Terminal 1:
+python3 app.py
+
+Terminal 2:
+cd react-frontend
+npm run dev
+
+Open:
+http://localhost:5173
+```
