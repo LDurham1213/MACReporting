@@ -106,8 +106,8 @@ The project uses the following technologies:
 - HTML
 - CSS
 - Vanilla JavaScript
-- React
-- Vite
+- React (builds the UI)
+- Vite (Develops and runs the React Interface)
 
 ### Development and Testing
 
