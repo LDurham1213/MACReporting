@@ -1,184 +1,457 @@
-.counter {
-  font-size: 16px;
-  padding: 5px 10px;
-  border-radius: 5px;
-  color: var(--accent);
-  background: var(--accent-bg);
-  border: 2px solid transparent;
-  transition: border-color 0.3s;
-  margin-bottom: 24px;
-
-  &:hover {
-    border-color: var(--accent-border);
-  }
-  &:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
+* {
+  box-sizing: border-box;
 }
 
-.hero {
-  position: relative;
-
-  .base,
-  .framework,
-  .vite {
-    inset-inline: 0;
-    margin: 0 auto;
-  }
-
-  .base {
-    width: 170px;
-    position: relative;
-    z-index: 0;
-  }
-
-  .framework,
-  .vite {
-    position: absolute;
-  }
-
-  .framework {
-    z-index: 1;
-    top: 34px;
-    height: 28px;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg)
-      scale(1.4);
-  }
-
-  .vite {
-    z-index: 0;
-    top: 107px;
-    height: 26px;
-    width: auto;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg)
-      scale(0.8);
-  }
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f5f5f5;
+  color: #222222;
 }
 
-#center {
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+
+/* Main Application */
+
+.app {
+  min-height: 100vh;
+}
+
+/* Header */
+
+.app-header {
+  background: #ffffff;
+  border-bottom: 4px solid #b30818;
+  padding: 24px 40px;
+}
+
+.chapter-label {
+  margin: 0 0 5px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #b30818;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 36px;
+  font-weight: 700;
+  color: #111111;
+}
+
+.header-description {
+  margin: 5px 0 0;
+  color: #666666;
+}
+
+
+/* Dashboard */
+
+.dashboard {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 30px 40px;
+}
+
+/* Panels */
+
+.template-panel,
+.detail-panel {
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #dddddd;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
+}
+
+.template-panel {
+  padding: 20px;
+  height: fit-content;
+}
+
+.detail-panel {
+  padding: 28px;
+  min-height: 600px;
+}
+
+/* Left Side */
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.panel-heading h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.panel-heading span {
+  background: #eeeeee;
+  border-radius: 20px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.template-list {
   display: flex;
   flex-direction: column;
-  gap: 25px;
-  place-content: center;
-  place-items: center;
-  flex-grow: 1;
-
-  @media (max-width: 1024px) {
-    padding: 32px 20px 24px;
-    gap: 18px;
-  }
+  gap: 8px;
+  margin-bottom: 18px;
 }
 
-#next-steps {
-  display: flex;
-  border-top: 1px solid var(--border);
+.template-item {
+  width: 100%;
   text-align: left;
-
-  & > div {
-    flex: 1 1 0;
-    padding: 32px;
-    @media (max-width: 1024px) {
-      padding: 24px 20px;
-    }
-  }
-
-  .icon {
-    margin-bottom: 16px;
-    width: 22px;
-    height: 22px;
-  }
-
-  @media (max-width: 1024px) {
-    flex-direction: column;
-    text-align: center;
-  }
+  border: 1px solid #dddddd;
+  background: #ffffff;
+  padding: 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s;
 }
 
-#docs {
-  border-right: 1px solid var(--border);
-
-  @media (max-width: 1024px) {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
+.template-item:hover {
+  border-color: #b30818;
+  background: #fafafa;
 }
 
-#next-steps ul {
-  list-style: none;
-  padding: 0;
+.template-item.selected {
+  background: #f9e8ea;
+  border-color: #b30818;
+  border-left: 5px solid #b30818;
+}
+
+.template-name {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.template-description {
+  display: block;
+  font-size: 12px;
+  color: #666666;
+  line-height: 1.4;
+}
+
+
+/* Right Side */
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #dddddd;
+}
+
+.detail-header h2 {
+  margin: 4px 0 8px;
+  font-size: 28px;
+}
+
+.detail-header p {
+  margin: 0;
+  color: #666666;
+}
+
+.section-label {
+  margin: 0;
+  color: #b30818;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+
+/* Questions */
+
+.questions-section {
+  margin-top: 28px;
+}
+
+.questions-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.questions-heading h3 {
+  margin: 3px 0 0;
+  font-size: 22px;
+}
+
+
+/* Table */
+
+.question-table {
+  border: 1px solid #dddddd;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.question-table-header,
+.question-row {
+  display: grid;
+  grid-template-columns:
+    minmax(240px, 2fr)
+    minmax(120px, 1fr)
+    100px
+    150px;
+  gap: 12px;
+  align-items: center;
+}
+.question-table-header span {
+  min-width: 0;
+}
+
+.row-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  white-space: nowrap;
+}
+.question-table-header {
+  background: #f0f0f0;
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.question-row {
+  padding: 14px 16px;
+  border-top: 1px solid #eeeeee;
+  font-size: 14px;
+}
+
+.question-row:hover {
+  background: #fafafa;
+}
+
+.question-text {
+  font-weight: 600;
+}
+
+.row-actions {
   display: flex;
   gap: 8px;
-  margin: 32px 0 0;
-
-  .logo {
-    height: 18px;
-  }
-
-  a {
-    color: var(--text-h);
-    font-size: 16px;
-    border-radius: 6px;
-    background: var(--social-bg);
-    display: flex;
-    padding: 6px 12px;
-    align-items: center;
-    gap: 8px;
-    text-decoration: none;
-    transition: box-shadow 0.3s;
-
-    &:hover {
-      box-shadow: var(--shadow);
-    }
-    .button-icon {
-      height: 18px;
-      width: 18px;
-    }
-  }
-
-  @media (max-width: 1024px) {
-    margin-top: 20px;
-    flex-wrap: wrap;
-    justify-content: center;
-
-    li {
-      flex: 1 1 calc(50% - 8px);
-    }
-
-    a {
-      width: 100%;
-      justify-content: center;
-      box-sizing: border-box;
-    }
-  }
 }
 
-#spacer {
-  height: 88px;
-  border-top: 1px solid var(--border);
-  @media (max-width: 1024px) {
-    height: 48px;
-  }
+
+/* Buttons */
+
+.primary-button {
+  background: #b30818;
+  color: #ffffff;
+  border: none;
+  border-radius: 5px;
+  padding: 9px 14px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
-.ticks {
-  position: relative;
+.primary-button:hover {
+  background: #8f0713;
+}
+
+.edit-button {
+  background: #222222;
+  color: #ffffff;
+  border: none;
+  border-radius: 5px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.delete-button {
+  background: #ffffff;
+  color: #b30818;
+  border: 1px solid #b30818;
+  border-radius: 5px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.text-button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: #333333;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.text-button:hover {
+  text-decoration: underline;
+}
+
+.delete-text {
+  color: #b30818;
+}
+
+
+/* Empty State */
+
+.empty-state {
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #777777;
+}
+
+.empty-state h2 {
+  color: #333333;
+  margin-bottom: 8px;
+}
+
+
+/* Smaller Screens */
+
+@media (max-width: 850px) {
+
+  .dashboard {
+    grid-template-columns: 1fr;
+    padding: 20px;
+  }
+
+  .detail-header {
+    flex-direction: column;
+  }
+
+  .question-table-header {
+    display: none;
+  }
+
+  .question-row {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+}
+/* Text colors */
+
+.app {color: #222222;}
+.app h1,
+.app h2,
+.app h3,
+.app p,
+.app label {
+  color: #222222;
+}
+
+.app-header h1 {color: #111111;}
+.chapter-label,
+.section-label {color: #b30818 !important;}
+.template-name {color: #222222;}
+.template-item.selected .template-name {color: #222222;}
+
+/* Selected Template Edit/Delete buttons */
+.detail-header .action-buttons {align-items: flex-start;}
+.detail-header .edit-button,
+.detail-header .delete-button {
+  padding: 6px 12px;
+  font-size: 13px;
+  width: auto;
+  min-width: 65px;
+}
+
+/* Center the Actions column heading */
+.question-table-header span:last-child {
+  text-align: center;
+}
+
+/* Center Edit/Delete inside the Actions column */
+.row-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+
+/* =========================================
+   FORM LAYOUT
+========================================= */
+
+.template-form-panel,
+.question-form-panel {
+  max-width: 650px;
+}
+
+/* Keep each label and field neatly stacked */
+.form-group {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+/* Labels */
+.form-group label {
+  font-weight: 600;
+  color: #222222;
+  text-align: left;
+}
+
+/* Make ALL form fields the same width */
+.form-group input,
+.form-group select,
+.form-group textarea {
   width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #cccccc;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #222222;
+  font-size: 14px;
+}
 
-  &::before,
-  &::after {
-    content: '';
-    position: absolute;
-    top: -4.5px;
-    border: 5px solid transparent;
-  }
+/* Keep normal fields the same height */
+.form-group input,
+.form-group select {
+  height: 42px;
+}
 
-  &::before {
-    left: 0;
-    border-left-color: var(--border);
-  }
-  &::after {
-    right: 0;
-    border-right-color: var(--border);
-  }
+/* Question box can be taller */
+.form-group textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+/* Highlight the field being used */
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: 2px solid #b30818;
+  outline-offset: 1px;
+  border-color: #b30818;
 }

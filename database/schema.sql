@@ -15,4 +15,5 @@ CREATE TABLE questions (
 
     FOREIGN KEY (report_template_id)
         REFERENCES report_templates(id)
+        ON DELETE CASCADE
 );

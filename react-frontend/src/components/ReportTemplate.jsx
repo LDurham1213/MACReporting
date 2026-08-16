@@ -1,16 +1,24 @@
-function ReportTemplate({ template, onViewQuestions }) {
-
+function ReportTemplate({
+  template,
+  selected,
+  onViewQuestions
+}) {
   return (
-    <div>
-        <h3>{template.name}</h3>
-        <p>{template.description}</p>
+    <button
+      className={`template-item ${
+        selected ? "selected" : ""
+      }`}
+      onClick={() => onViewQuestions(template)}
+    >
+      <span className="template-name">
+        {template.name}
+      </span>
 
-        <button onClick={() => onViewQuestions(template.id)}>
-          View Questions
-        </button>
-    </div>
-    );
-
+      <span className="template-description">
+        {template.description}
+      </span>
+    </button>
+  );
 }
 
 export default ReportTemplate;
