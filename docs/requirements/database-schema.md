@@ -2,17 +2,19 @@
 
 ## Purpose
 
-This document defines the proposed production database structure for MACReporting.
+This document defines the production database structure for MACReporting.
 
-It translates the approved UML data model into a database-focused specification that can later be implemented in the selected production relational database.
+It translates the approved UML data model and application workflow into a PostgreSQL-focused database specification for the production version of the application.
 
-The final database platform is pending confirmation of the production hosting environment. The schema design should remain portable across PostgreSQL and MySQL/MariaDB where practical.
+**Production database platform: PostgreSQL 17**
+
+The schema supports the Phase 1 reporting application while preserving historical reporting accuracy and providing a foundation for future Phase 2 reporting and analytics.
 
 ---
 
 # 1. Database Design Principles
 
-The production database should support:
+The production database must support:
 
 - Multi-user access
 - Role-based permissions
@@ -20,13 +22,14 @@ The production database should support:
 - Historical reporting
 - Report Template versioning
 - Question versioning
+- Report workflow and approval history
 - Report locking/finalization
 - Image and attachment metadata
-- PDF generation
+- PDF generation after locking
 - Excel export
 - Future Phase 2 reporting and analytics
 
-The database should preserve historical meaning.
+The database must preserve historical meaning.
 
 Existing Report data must not silently change because:
 
@@ -35,11 +38,15 @@ Existing Report data must not silently change because:
 - A User's role changed
 - A Report Template was updated
 - Committee membership changed
+- A Report moved through the approval workflow
 - A Report was later locked
+- A PDF was later generated
 
-Historical records should remain tied to the values, versions, and relationships that were valid when the Report was created or answered.
+Historical records must remain tied to the values, versions, Users, and relationships that were valid when the Report was created, answered, submitted, reviewed, approved, or locked.
 
 Dates should use the `YYYY-MM-DD` format where applicable.
+
+PostgreSQL timestamps should use timezone-aware timestamps where appropriate.
 
 ---
 
@@ -49,9 +56,9 @@ Dates should use the `YYYY-MM-DD` format where applicable.
 
 The `User` entity represents an individual who can access MACReporting.
 
-Users are identified through their unique individual email address.
+Users are identified for authentication purposes through their unique individual email address.
 
-Email identifies the person for authentication purposes but is not the database primary key.
+Email identifies the person but is not the database primary key.
 
 ## Proposed Fields
 
@@ -62,12 +69,14 @@ Email identifies the person for authentication purposes but is not the database 
 | `last_name` | User last name |
 | `email` | Unique individual email address |
 | `active` | Indicates whether the User currently has application access |
+| `created_at` | Date/time the User record was created |
+| `updated_at` | Date/time the User record was most recently updated |
 
 ## Key Rules
 
 - `user_id` is the primary key.
 - `email` must be unique.
-- Email should not be used as the primary key.
+- Email must not be used as the primary key.
 - Users referenced by historical data should normally be deactivated rather than deleted.
 - A User may have multiple chapter-wide Roles over time.
 - A User may belong to multiple Committees.
@@ -81,17 +90,27 @@ User 1 -> Many UserRole
 User 1 -> Many UserCommittee
 
 User 1 -> Many Report
+         through created_by_user_id
 
 User 1 -> Many Answer
          through answered_by
 
 User 1 -> Many Attachment
          through uploaded_by
+
+User 1 -> Many ReportStatusHistory
+         through changed_by_user_id
+
+User 1 -> Many Report
+         through locked_by_user_id
+
+User 1 -> Many Report
+         through pdf_created_by_user_id
 ```
 
 ## Historical Data Consideration
 
-If a User leaves, changes email address, or no longer requires MACReporting access, historical Reports, Answers, Attachments, and assignments must continue to retain their original User relationships.
+If a User leaves, changes email address, or no longer requires MACReporting access, historical Reports, Answers, Attachments, status changes, and assignments must continue to retain their original User relationships.
 
 Users referenced by historical records should therefore not normally be physically deleted.
 
@@ -141,24 +160,40 @@ User 1 -> Many UserRole
 
 ## Access Considerations
 
-The following Roles are currently expected to have elevated application access:
+Chapter-wide roles provide different levels of authority.
 
-- President
-- VP1
-- VP2
-- Technology Chair
+### President
 
-These Users may:
+The President may:
 
 - View Reports across all Committees
-- Create and update Reports as authorized
-- Access administrative functionality
-- Lock Reports
-- Unlock Reports
-- Place Reports into final/read-only status
-- Manage Report Templates where authorized
+- Access approved Reports
+- Lock approved Reports
+- Generate PDFs for locked Reports
+- Archive Reports where authorized
+- Access administrative functionality where authorized
 
-Exact permissions must be enforced by the application authorization layer rather than only by frontend controls.
+### VP1 / VP2
+
+The appropriate Vice President may:
+
+- View Reports routed to their area of responsibility
+- Review submitted Reports
+- Return Reports for changes
+- Approve Reports
+- View historical Reports as authorized
+
+VP assignment/routing rules are enforced by the application authorization layer.
+
+### Technology Chair
+
+The Technology Chair may:
+
+- Access system administration functionality where authorized
+- Manage Report Templates where authorized
+- Support application configuration and maintenance
+
+Technology Chair system access does not automatically grant business approval, Report locking, or PDF-generation authority.
 
 ## Historical Data Consideration
 
@@ -275,13 +310,12 @@ Additional Committee roles may be introduced later if required.
 
 A current Committee Chair should have elevated permissions for the Committee they chair.
 
-A Committee Member may access Reports associated with Committees to which they are assigned, subject to the final authorization rules.
-
 For the current access model:
 
-- Chair: create/update Reports for the Committee they chair.
-- Other Committee Reports: view-only where permitted.
-- Elevated chapter Roles: broader access across Committees.
+- Committee Chair: create/update Reports for the Committee they chair.
+- Committee Chair: submit Reports for the Committee they chair.
+- Committee Member: view Reports where permitted.
+- Elevated chapter Roles: broader access based on role.
 
 Email identifies **who the User is**.
 
@@ -373,7 +407,8 @@ The master Question remains stable while wording, type, and other version-specif
 ## Key Rules
 
 - `question_id` is the primary key.
-- `question_code` should identify the logical Question consistently over time.
+- `question_code` must identify the logical Question consistently over time.
+- `question_code` should be unique.
 - The master Question should not be overwritten when wording changes.
 - Wording/type changes are handled through `QuestionVersion`.
 - A Question may have many versions.
@@ -474,31 +509,54 @@ QuestionVersion 1 -> Many ReportQuestion
 QuestionVersion 1 -> Many Answer
 ```
 
-## Versioning Example
+---
 
-Version 1:
+# 9. ReportTemplateVersion
+
+## Purpose
+
+The `ReportTemplateVersion` entity represents a specific immutable version of a Report Template.
+
+Template versioning preserves the exact Template structure used when a historical Report was created.
+
+## Proposed Fields
+
+| Field | Purpose |
+|---|---|
+| `report_template_id` | Foreign key to ReportTemplate and part of composite primary key |
+| `version` | Version number and part of composite primary key |
+| `created_by` | Foreign key to User who created the Template version |
+| `created_at` | Date/time the Template version was created |
+| `active` | Indicates whether the Template version is currently active |
+
+## Primary Key
 
 ```text
-Question ID: 17
-Version: 1
-"How many people attended the program?"
+report_template_id + version
 ```
 
-Later:
+## Key Rules
+
+- `report_template_id` references `ReportTemplate.report_template_id`.
+- A Report Template may have multiple versions.
+- A Template version is immutable once used.
+- Template composition changes require creation of a new version.
+- Historical versions must remain available for existing Reports.
+- Deactivating a version must not affect Reports already referencing it.
+
+## Relationships
 
 ```text
-Question ID: 17
-Version: 2
-"How many unique attendees participated?"
+ReportTemplate        1 -> Many ReportTemplateVersion
+
+ReportTemplateVersion 1 -> Many ReportQuestion
+
+ReportTemplateVersion 1 -> Many Report
 ```
-
-Version 1 remains intact for historical Reports.
-
-New Template versions may use Version 2.
 
 ---
 
-# 9. ReportQuestion
+# 10. ReportQuestion
 
 ## Purpose
 
@@ -510,9 +568,9 @@ It defines the exact Questions that make up a particular Template version and co
 
 | Field | Purpose |
 |---|---|
-| `report_template_id` | Foreign key to ReportTemplateVersion |
+| `report_template_id` | Part of foreign key to ReportTemplateVersion |
 | `report_version` | Template version number |
-| `question_id` | Foreign key to QuestionVersion |
+| `question_id` | Part of foreign key to QuestionVersion |
 | `question_version` | Question version number |
 | `section_name` | Section in which the Question appears |
 | `display_order` | Order in which the Question is displayed |
@@ -522,8 +580,6 @@ It defines the exact Questions that make up a particular Template version and co
 | `active` | Indicates whether the relationship is active |
 
 ## Composite Primary Key
-
-The approved model identifies the relationship using:
 
 ```text
 report_template_id
@@ -557,7 +613,7 @@ references an exact `QuestionVersion`.
 - `display_order` belongs to the Template composition.
 - `required` may vary by Template version.
 - The same Question version may appear in multiple Template versions.
-- Once a Template version is used, its ReportQuestion composition should be treated as immutable.
+- Once a Template version is used, its ReportQuestion composition must be treated as immutable.
 - Template changes require a new `ReportTemplateVersion`.
 
 ## Relationships
@@ -568,37 +624,9 @@ ReportTemplateVersion 1 -> Many ReportQuestion
 QuestionVersion       1 -> Many ReportQuestion
 ```
 
-## Versioning Example
-
-Template Version 1:
-
-```text
-Q1 Version 1
-Q2 Version 1
-Q3 Version 1
-```
-
-Q2 changes, creating:
-
-```text
-Q2 Version 2
-```
-
-Template Version 2 becomes:
-
-```text
-Q1 Version 1
-Q2 Version 2
-Q3 Version 1
-```
-
-Old Reports remain associated with Template Version 1.
-
-New Reports use Template Version 2.
-
 ---
 
-# 10. Report
+# 11. Report
 
 ## Purpose
 
@@ -609,7 +637,11 @@ Examples include:
 - A monthly Committee Report
 - A Post-Mortem Report for a completed event or program
 
-The Report stores information about the Report instance itself. Individual Question responses are stored separately in `Answer`.
+The Report stores information about the Report instance itself.
+
+Individual Question responses are stored separately in `Answer`.
+
+Workflow transitions are stored separately in `ReportStatusHistory`.
 
 ## Proposed Fields
 
@@ -619,26 +651,31 @@ The Report stores information about the Report instance itself. Individual Quest
 | `report_template_id` | Part of foreign key to exact ReportTemplateVersion |
 | `report_template_version` | Part of foreign key to exact ReportTemplateVersion |
 | `committee_id` | Foreign key to Committee |
-| `submitted_by_user_id` | Foreign key to User |
+| `created_by_user_id` | Foreign key to User who created the Report |
 | `report_title` | Descriptive title for the Report |
 | `reporting_period` | Reporting month/period where applicable |
 | `event_date` | Event/program date where applicable |
-| `status` | Current Report status |
-| `created_date` | Date/time the Report was created |
-| `updated_date` | Date/time the Report was most recently updated |
+| `status` | Current Report workflow status |
+| `created_at` | Date/time the Report was created |
+| `updated_at` | Date/time the Report was most recently updated |
 | `locked` | Indicates whether the Report is read-only |
 | `locked_by_user_id` | Foreign key to User who locked the Report |
-| `locked_date` | Date/time the Report was locked |
+| `locked_at` | Date/time the Report was locked |
 | `pdf_path` | Storage reference for generated PDF output |
+| `pdf_created_by_user_id` | Foreign key to User who generated the PDF |
+| `pdf_created_at` | Date/time the PDF was generated |
 
 ## Key Rules
 
 - `report_id` is the primary key.
 - Every Report references an exact `ReportTemplateVersion`.
 - Every Report is associated with a Committee.
-- Submission information identifies the User responsible for submission.
+- `created_by_user_id` identifies the User who created the Report.
 - Reports containing historical Answers should not normally be physically deleted.
-- Report status and lock status must be enforced by the backend.
+- Report workflow status and lock status must be enforced by the backend.
+- PDF output must not be generated before a Report is locked.
+- Only the President may lock an approved Report under the current workflow.
+- Only the President may initiate final PDF generation under the current workflow.
 
 ## Exact Template Version Relationship
 
@@ -660,23 +697,50 @@ This ensures that each Report retains the exact Template configuration used when
 
 ## Report Status
 
-Initial statuses may include:
+The approved Phase 1 workflow statuses are:
 
-- `draft`
-- `submitted`
-- `final`
+```text
+draft
+submitted
+reviewed
+approved
+returned_for_changes
+locked
+archived
+other
+```
 
-Typical progression:
+Normal progression:
 
 ```text
 draft
   ↓
 submitted
   ↓
-final / locked
+reviewed
+  ↓
+approved
+  ↓
+locked
+  ↓
+archived
 ```
 
-The exact workflow may be refined during implementation.
+Return-for-changes progression:
+
+```text
+submitted / reviewed
+        ↓
+returned_for_changes
+        ↓
+draft
+        ↓
+submitted
+```
+
+`other` exists for exceptional cases and is not part of the normal workflow.
+
+`final` is not used as a separate status. A locked Report represents the finalized, read-only state.
 
 ## Reporting Period
 
@@ -701,11 +765,13 @@ ReportTemplateVersion 1 -> Many Report
 Committee             1 -> Many Report
 
 User                  1 -> Many Report
-                           through submitted_by_user_id
+                           through created_by_user_id
 
 Report                1 -> Many Answer
 
 Report                1 -> Many Attachment
+
+Report                1 -> Many ReportStatusHistory
 ```
 
 ## Access Considerations
@@ -715,7 +781,9 @@ Report                1 -> Many Attachment
 A current Committee Chair may:
 
 - Create Reports for the Committee they chair
-- Update unlocked Reports for that Committee
+- Update Draft Reports for that Committee
+- Update Reports returned for changes
+- Review the complete Report before submission
 - Submit Reports for that Committee
 - View Reports for that Committee
 
@@ -728,9 +796,25 @@ A Committee Member may have:
 
 Final Committee Member editing permissions will be confirmed with stakeholders.
 
-### Elevated Chapter Roles
+### Appropriate Vice President
 
-President, VP1, VP2, and Technology Chair may have full application access, including lock/unlock authority.
+The appropriate VP may:
+
+- View Reports submitted to their area of responsibility
+- Review submitted Reports
+- Return Reports for changes
+- Mark Reports reviewed
+- Approve Reports
+
+### President
+
+The President may:
+
+- View Reports across Committees
+- View approved Reports
+- Lock approved Reports
+- Generate PDF output after locking
+- Archive Reports where authorized
 
 ## Report Locking
 
@@ -742,24 +826,121 @@ locked = true
 
 normal Report, Answer, and Attachment changes must be rejected by the backend.
 
-The frontend should also display the Report as read-only.
+The frontend must display the Report as read-only.
 
-Authorized Users may unlock a Report when a legitimate correction is required.
+Under the current workflow:
 
-## Historical Data Consideration
+```text
+status = approved
+locked = false
+```
 
-A Report must preserve its historical relationships even when:
+means:
 
-- Committee membership changes
-- Committee leadership changes
-- User Roles change
-- Question versions change
-- Report Template versions change
-- Users become inactive
+```text
+The VP has approved the Report.
+The Report is awaiting President finalization.
+```
+
+After the President locks the Report:
+
+```text
+status = locked
+locked = true
+```
+
+The Report is finalized and read-only.
+
+Normal application users must not be able to unlock a locked Report through the standard workflow.
+
+If a future administrative correction process is required, it should be separately authorized and audited rather than silently modifying the historical record.
+
+## PDF Generation
+
+PDF generation is not part of the Draft, Submitted, Reviewed, or Approved workflow.
+
+A Report must first be locked.
+
+Conceptually:
+
+```text
+approved
+   ↓
+President locks Report
+   ↓
+locked
+   ↓
+Create PDF enabled
+```
+
+Until a PDF is generated:
+
+```text
+pdf_path = null
+pdf_created_by_user_id = null
+pdf_created_at = null
+```
+
+Once generated, the PDF metadata identifies the stored output, the User who created it, and the creation date/time.
 
 ---
 
-# 11. Answer
+# 12. ReportStatusHistory
+
+## Purpose
+
+The `ReportStatusHistory` entity records every workflow-status transition for a Report.
+
+It provides an auditable history of submission, review, approval, return-for-changes, locking, and archival activity.
+
+## Proposed Fields
+
+| Field | Purpose |
+|---|---|
+| `report_status_history_id` | Primary key |
+| `report_id` | Foreign key to Report |
+| `from_status` | Previous Report status |
+| `to_status` | New Report status |
+| `changed_by_user_id` | Foreign key to User who performed the transition |
+| `changed_at` | Date/time the transition occurred |
+| `comments` | Optional workflow comments |
+
+## Key Rules
+
+- Every workflow status change should create a `ReportStatusHistory` record.
+- History records should not normally be edited.
+- History records should not normally be deleted.
+- `returned_for_changes` transitions should normally include comments explaining what must be corrected.
+- Multiple return/resubmission cycles must be retained.
+- `Report.status` represents the current state.
+- `ReportStatusHistory` represents how the Report reached that state.
+
+## Relationships
+
+```text
+Report 1 -> Many ReportStatusHistory
+
+User   1 -> Many ReportStatusHistory
+             through changed_by_user_id
+```
+
+## Example
+
+```text
+draft -> submitted
+submitted -> returned_for_changes
+returned_for_changes -> draft
+draft -> submitted
+submitted -> reviewed
+reviewed -> approved
+approved -> locked
+```
+
+The complete history remains available even when a Report passes through the same status more than once.
+
+---
+
+# 13. Answer
 
 ## Purpose
 
@@ -800,32 +981,6 @@ User            1 -> Many Answer
                      through answered_by
 ```
 
-## Question Version Relationship
-
-The pair:
-
-```text
-question_id + question_version
-```
-
-references an exact `QuestionVersion`.
-
-## Example
-
-Historical Report:
-
-```text
-Report ID: 105
-
-Question ID: 17
-Question Version: 1
-Answer Value: 125
-```
-
-Later, Question 17 Version 2 may be introduced.
-
-The historical Answer remains associated with Version 1.
-
 ## Answer Value Storage
 
 `answer_value` may represent:
@@ -848,13 +1003,13 @@ Before submission, the backend must verify that all required ReportQuestions hav
 
 ## Historical Data Consideration
 
-Answers associated with submitted/final Reports should normally be retained for the life of the Report.
+Answers associated with submitted and historical Reports should normally be retained for the life of the Report.
 
 Deleting or changing a User, Committee, Template, or Question must not cause historical Answers to disappear or change meaning.
 
 ---
 
-# 12. Attachment
+# 14. Attachment
 
 ## Purpose
 
@@ -881,10 +1036,10 @@ The database stores metadata and a storage reference rather than the physical fi
 | `report_id` | Foreign key to Report |
 | `uploaded_by` | Foreign key to User |
 | `original_filename` | Original uploaded filename |
-| `storage_key` / `file_path` | External storage reference |
-| `mime_type` / `file_type` | File MIME type or format |
+| `storage_key` | External storage reference |
+| `mime_type` | File MIME type |
 | `file_size` | File size |
-| `caption` / `description` | Optional description/caption |
+| `description` | Optional description/caption |
 | `include_in_pdf` | Indicates whether the Attachment should appear in generated PDF output |
 | `uploaded_at` | Date/time the file was uploaded |
 | `active` | Indicates whether the Attachment is currently active |
@@ -919,28 +1074,6 @@ The storage reference may ultimately represent:
 
 The final storage method depends on the selected production hosting architecture.
 
-## Image Uploads
-
-Committee members with appropriate Report-editing permissions may upload images directly to an editable Report.
-
-Conceptually:
-
-```text
-Upload Images / Attachments
-        ↓
-Select File(s)
-        ↓
-Validate
-        ↓
-Store File
-        ↓
-Create Attachment Record
-        ↓
-Associate with Report
-```
-
-Multiple images may be associated with one Report.
-
 ## Supported File Types
 
 Initial candidates include:
@@ -972,144 +1105,11 @@ The backend should validate:
 
 `include_in_pdf` determines whether an Attachment should be incorporated into generated Report output where supported.
 
-The PDF-generation process may use:
-
-- Storage reference
-- Original filename
-- Caption/description
-- File type
-- `include_in_pdf`
-
-The actual PDF layout remains an application/output responsibility.
-
-## Historical Data Consideration
-
-Attachments are part of the supporting historical record for a Report.
-
-Changes to Users, Roles, Committee membership, Templates, or Questions must not break the relationship between an Attachment and its Report.
+PDF generation is only available after the Report has been locked.
 
 ---
 
-# 13. ReportTemplateVersion
-
-## Purpose
-
-The `ReportTemplateVersion` entity represents a specific immutable version of a Report Template.
-
-Template versioning preserves the exact Template structure used when a historical Report was created.
-
-## Proposed Fields
-
-| Field | Purpose |
-|---|---|
-| `report_template_id` | Foreign key to ReportTemplate and part of composite primary key |
-| `version` | Version number and part of composite primary key |
-| `created_by` | Foreign key to User who created the Template version |
-| `created_at` | Date/time the Template version was created |
-| `active` | Indicates whether the Template version is currently active |
-
-## Primary Key
-
-```text
-report_template_id + version
-```
-
-Example:
-
-```text
-report_template_id = 1, version = 1
-report_template_id = 1, version = 2
-```
-
-Both represent versions of the same logical Report Template.
-
-## Key Rules
-
-- `report_template_id` references `ReportTemplate.report_template_id`.
-- A Report Template may have multiple versions.
-- A Template version is immutable once used.
-- Template composition changes require creation of a new version.
-- Historical versions must remain available for existing Reports.
-- Deactivating a version must not affect Reports already referencing it.
-
-## Relationships
-
-```text
-ReportTemplate        1 -> Many ReportTemplateVersion
-
-ReportTemplateVersion 1 -> Many ReportQuestion
-
-ReportTemplateVersion 1 -> Many Report
-```
-
-## Versioning Example
-
-Template Version 1:
-
-```text
-Q1v1
-Q2v1
-Q3v1
-```
-
-Q2 wording changes.
-
-Create:
-
-```text
-Q2v2
-```
-
-Then create Template Version 2:
-
-```text
-Q1v1
-Q2v2
-Q3v1
-```
-
-New Reports use Version 2.
-
-Old Reports remain on Version 1.
-
-Answers remain tied to their exact Question versions.
-
-## Historical Data Protection
-
-The complete historical chain is:
-
-```text
-ReportTemplate
-      |
-      +--> ReportTemplateVersion
-                    |
-                    +--> ReportQuestion
-                              |
-                              +--> QuestionVersion
-                                          |
-                                          +--> Answer
-```
-
-A Report references the exact `ReportTemplateVersion`.
-
-An Answer references the exact `QuestionVersion`.
-
-Together these relationships preserve the historical meaning and composition of the Report.
-
-## Immutability
-
-Once a Template version has been used:
-
-1. Preserve the existing version.
-2. Create a new Template version when changes are required.
-3. Associate the appropriate Question versions through `ReportQuestion`.
-4. Make the new version available for future Reports.
-
-Existing Reports remain unchanged.
-
----
-
-# 14. Relationship and Integrity Rules
+# 15. Relationship and Integrity Rules
 
 ## Primary Relationships
 
@@ -1130,6 +1130,10 @@ Committee             1 -> Many Report
 
 User                  1 -> Many Report
 
+Report                1 -> Many ReportStatusHistory
+
+User                  1 -> Many ReportStatusHistory
+
 Report                1 -> Many Answer
 
 QuestionVersion       1 -> Many Answer
@@ -1144,8 +1148,6 @@ Committee             1 -> Many UserCommittee
 ```
 
 ## Composite Foreign Keys
-
-Two version-aware composite foreign-key relationships are central to the design.
 
 ### Report to ReportTemplateVersion
 
@@ -1220,6 +1222,7 @@ Normal application behavior should avoid cascading deletion of historical:
 - Reports
 - Answers
 - Attachments
+- Status history
 - Template versions
 - Question versions
 - User assignments
@@ -1229,14 +1232,14 @@ Normal application behavior should avoid cascading deletion of historical:
 At minimum:
 
 - `User.email` must be unique.
-- `Question.question_code` should be unique.
+- `Question.question_code` must be unique.
 - Version numbers must be unique within their parent master record.
 
 Where business rules require one Committee Report per Committee/reporting period, an appropriate uniqueness rule should be implemented once the exact reporting-period behavior is finalized.
 
 ---
 
-# 15. Access-Control Rules
+# 16. Access-Control Rules
 
 Authorization is determined using both:
 
@@ -1281,11 +1284,11 @@ COMMITTEE_MEMBER
 A current Committee Chair may:
 
 - Create Reports for the Committee they chair
-- Update editable Reports for that Committee
+- Update Draft Reports for that Committee
+- Update Reports returned for changes
+- Review Reports before submission
 - Submit Reports for that Committee
 - View Reports for that Committee
-
-Access to other Committees may be view-only where permitted.
 
 ## Committee Member
 
@@ -1296,17 +1299,35 @@ A Committee Member may:
 
 Additional editing permissions may be introduced if approved by stakeholders.
 
-## Elevated Roles
+## Appropriate VP
 
-President, VP1, VP2, and Technology Chair may:
+The appropriate VP may:
 
-- View all Reports
-- Create/update Reports where authorized
-- Access administrative functionality
-- Manage Templates where authorized
-- Lock Reports
-- Unlock Reports
-- Place Reports into final/read-only status
+- View submitted Reports routed to them
+- Review Reports
+- Return Reports for changes
+- Mark Reports reviewed
+- Approve Reports
+
+## President
+
+The President may:
+
+- View Reports across all Committees
+- View approved Reports
+- Lock approved Reports
+- Generate PDF output after locking
+- Archive Reports where authorized
+
+## Technology Chair
+
+The Technology Chair may:
+
+- Perform authorized administrative functions
+- Manage Templates and configuration where authorized
+- Support application administration
+
+Technology Chair authority does not automatically include Report approval, locking, or PDF generation.
 
 ## Backend Enforcement
 
@@ -1320,29 +1341,107 @@ Every protected API operation must verify:
 2. The User's active UserRole assignments.
 3. The User's active UserCommittee assignments.
 4. The Committee associated with the requested Report.
-5. The Report's lock status.
-6. The requested action.
+5. The Report's current status.
+6. The Report's lock status.
+7. The requested action.
 
 ---
 
-# 16. Report Locking and Historical Protection
+# 17. Report Workflow, Locking, and Historical Protection
 
-Locked/finalized Reports are read-only except when an authorized User performs an approved unlock.
+## Workflow
 
-Users authorized to lock/unlock currently include:
-
-- President
-- VP1
-- VP2
-- Technology Chair
-
-When a Report is locked:
+The normal workflow is:
 
 ```text
-Report.locked = true
+DRAFT
+  ↓
+SUBMITTED
+  ↓
+REVIEWED
+  ↓
+APPROVED
+  ↓
+LOCKED
+  ↓
+ARCHIVED
 ```
 
-the backend should reject normal:
+A VP may return a Report for changes:
+
+```text
+SUBMITTED / REVIEWED
+        ↓
+RETURNED_FOR_CHANGES
+        ↓
+DRAFT
+        ↓
+SUBMITTED
+```
+
+Every status transition must be written to `ReportStatusHistory`.
+
+## Draft
+
+While a Report is in Draft:
+
+- Authorized Users may edit it.
+- Required-field validation may occur as the User progresses.
+- The complete Report may be reviewed in HTML within the application.
+- No PDF is generated.
+
+## Submitted
+
+When submitted:
+
+- The Report is routed to the appropriate VP.
+- Normal Committee-level editing stops.
+- The Report remains viewable.
+- The VP may review or return it for changes.
+
+## Reviewed
+
+A reviewed Report has been evaluated by the appropriate VP but has not yet received final VP approval.
+
+The VP may:
+
+- Approve the Report.
+- Return it for changes.
+
+## Returned for Changes
+
+When returned:
+
+- The reason for return should be recorded in `ReportStatusHistory.comments`.
+- The Report becomes editable again for the authorized Committee User.
+- The Report may be corrected and resubmitted.
+- Previous workflow history remains intact.
+
+## Approved
+
+An approved Report has completed VP approval.
+
+At this point:
+
+```text
+status = approved
+locked = false
+```
+
+The Report awaits President finalization.
+
+## Locked
+
+Only the President may lock an approved Report under the current business workflow.
+
+When locked:
+
+```text
+status = locked
+locked = true
+```
+
+The backend must reject normal:
 
 - Report updates
 - Answer creation
@@ -1351,19 +1450,23 @@ the backend should reject normal:
 - Attachment uploads
 - Attachment replacement/removal
 
-Lock metadata must retain:
+The frontend must display the Report as read-only.
 
-```text
-locked
-locked_by_user_id
-locked_date
-```
+## Archived
 
-Unlock behavior should be auditable if additional audit-history requirements are introduced.
+Archived Reports remain part of the historical record.
+
+Archiving must not physically delete the Report or its related data.
+
+## Other
+
+`other` exists for exceptional cases requiring a status outside the normal workflow.
+
+Its use should be restricted and documented.
 
 ---
 
-# 17. Versioning Workflow
+# 18. Versioning Workflow
 
 MACReporting uses versioning to prevent historical Reports from changing when Templates or Questions evolve.
 
@@ -1371,6 +1474,7 @@ Example workflow:
 
 ```text
 1. Template Version 1 uses:
+
    Q1v1
    Q2v1
    Q3v1
@@ -1384,6 +1488,7 @@ Example workflow:
 5. Create Template Version 2.
 
 6. ReportQuestion for Template Version 2 uses:
+
    Q1v1
    Q2v2
    Q3v1
@@ -1397,9 +1502,29 @@ Example workflow:
 
 This design allows MACReporting to evolve without rewriting history.
 
+## Historical Chain
+
+```text
+ReportTemplate
+      |
+      +--> ReportTemplateVersion
+                    |
+                    +--> ReportQuestion
+                              |
+                              +--> QuestionVersion
+                                          |
+                                          +--> Answer
+```
+
+A Report references the exact `ReportTemplateVersion`.
+
+An Answer references the exact `QuestionVersion`.
+
+Together these relationships preserve the historical meaning and composition of the Report.
+
 ---
 
-# 18. File and PDF Storage
+# 19. File and PDF Storage
 
 Physical Attachments and generated PDF Reports should live outside the relational database.
 
@@ -1408,7 +1533,7 @@ The database retains storage references.
 Examples:
 
 ```text
-Attachment.storage_key / file_path
+Attachment.storage_key
 
 Report.pdf_path
 ```
@@ -1422,9 +1547,145 @@ This separation:
 - Supports future migration between storage providers
 - Allows PDF and image files to be managed independently
 
+## PDF Lifecycle
+
+PDF files are not generated while Reports are:
+
+```text
+draft
+submitted
+reviewed
+approved
+returned_for_changes
+```
+
+PDF generation becomes available only when:
+
+```text
+status = locked
+locked = true
+```
+
+The President initiates PDF generation.
+
+The resulting metadata is stored in:
+
+```text
+pdf_path
+pdf_created_by_user_id
+pdf_created_at
+```
+
+The PDF is therefore a final output artifact rather than a second editable version of the Report.
+
 ---
 
-# 19. Phase 2 Reporting and Analytics
+# 20. PostgreSQL Production Implementation
+
+MACReporting uses PostgreSQL 17 as the production relational database platform.
+
+The original class-project SQLite database is not the target production database.
+
+## PostgreSQL Data Types
+
+The physical schema should use PostgreSQL-appropriate data types, including:
+
+```text
+BIGINT GENERATED BY DEFAULT AS IDENTITY
+VARCHAR
+TEXT
+BOOLEAN
+DATE
+TIMESTAMPTZ
+INTEGER
+NUMERIC
+```
+
+where appropriate.
+
+## Primary Keys
+
+Generated numeric primary keys should use PostgreSQL identity columns rather than SQLite-specific auto-increment behavior.
+
+Example:
+
+```sql
+user_id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY
+```
+
+## Boolean Values
+
+Boolean fields should use PostgreSQL:
+
+```sql
+BOOLEAN
+```
+
+with explicit defaults where appropriate.
+
+Example:
+
+```sql
+active BOOLEAN NOT NULL DEFAULT TRUE
+```
+
+## Timestamps
+
+Audit and workflow timestamps should generally use:
+
+```sql
+TIMESTAMPTZ
+```
+
+to preserve timezone-aware date/time information.
+
+## Report Status Constraint
+
+Report status should initially use a `VARCHAR` field with a `CHECK` constraint rather than a PostgreSQL ENUM.
+
+Conceptually:
+
+```sql
+status VARCHAR(30) NOT NULL DEFAULT 'draft'
+CHECK (
+    status IN (
+        'draft',
+        'submitted',
+        'reviewed',
+        'approved',
+        'returned_for_changes',
+        'locked',
+        'archived',
+        'other'
+    )
+)
+```
+
+This preserves database-level validation while allowing the workflow to evolve more easily than a database ENUM.
+
+## Connection Configuration
+
+Database credentials must not be hard-coded into source code.
+
+The Flask application should obtain connection information through environment variables.
+
+Expected configuration will include values such as:
+
+```text
+DB_HOST
+DB_PORT
+DB_NAME
+DB_USER
+DB_PASSWORD
+```
+
+or a secure database connection URL.
+
+Credentials must not be committed to GitHub.
+
+---
+
+# 21. Phase 2 Reporting and Analytics
 
 Phase 2 will consume the structured and version-aware Phase 1 data without changing historical records.
 
@@ -1512,35 +1773,7 @@ Phase 2 relationships shown conceptually in the UML are not Phase 1 foreign-key 
 
 ---
 
-# 20. Production Database Implementation Notes
-
-The current class-project database uses SQLite.
-
-SQLite will not be treated as the target production database for the multi-user production version of MACReporting.
-
-The final production database platform will be selected after confirming the production hosting environment.
-
-Potential relational database platforms include:
-
-- PostgreSQL
-- MySQL/MariaDB
-
-The final SQL implementation must account for the selected platform's:
-
-- Data types
-- Auto-generated primary-key syntax
-- Boolean handling
-- Date/time types
-- Composite foreign-key syntax
-- Constraint behavior
-- Indexing
-- Connection configuration
-
-The application should avoid unnecessary database-specific logic where practical.
-
----
-
-# 21. Migration from Existing Class-Project Schema
+# 22. Migration from Existing Class-Project Schema
 
 The original class-project schema contains:
 
@@ -1561,7 +1794,11 @@ Existing report_templates
 ReportTemplate
         +
 ReportTemplateVersion
+```
 
+and:
+
+```text
 Existing questions
         ↓
 Question
@@ -1590,13 +1827,15 @@ QuestionVersion 1
 ReportQuestion relationship
 ```
 
-The current SQLite database should remain available as a reference during migration until the production data model and seed process have been validated.
+The current SQLite database should remain available as a reference during migration until the PostgreSQL production data model and seed process have been validated.
+
+SQLite should not remain a runtime dependency of the production application after migration is complete.
 
 ---
 
-# 22. Production Schema Implementation Sequence
+# 23. Production Schema Implementation Sequence
 
-Once the production database platform is confirmed, implementation should proceed in dependency order.
+The PostgreSQL implementation should proceed in dependency order.
 
 Recommended sequence:
 
@@ -1611,11 +1850,10 @@ Recommended sequence:
 8. QuestionVersion
 9. ReportQuestion
 10. Report
-11. Answer
-12. Attachment
+11. ReportStatusHistory
+12. Answer
+13. Attachment
 ```
-
-This order allows referenced parent records to exist before dependent foreign-key records are created.
 
 After table creation:
 
@@ -1623,6 +1861,8 @@ After table creation:
 Create constraints
         ↓
 Create indexes
+        ↓
+Validate foreign keys
         ↓
 Create initial Users/Committees as appropriate
         ↓
@@ -1636,18 +1876,23 @@ Create Question Version 1 records
         ↓
 Create ReportQuestion relationships
         ↓
+Seed minimum development/test data
+        ↓
 Validate relationships
         ↓
 Update Flask data-access layer
+        ↓
+Test PostgreSQL CRUD
+        ↓
+Connect Committee Report workflow
 ```
 
 ---
 
-# 23. Open Implementation Decisions
+# 24. Open Implementation Decisions
 
-The following implementation details remain intentionally unresolved until hosting and stakeholder requirements are confirmed:
+The following implementation details remain unresolved until hosting and remaining stakeholder requirements are confirmed:
 
-- Production database platform
 - Production file-storage provider/location
 - Authentication implementation
 - Final Committee Member editing permissions
@@ -1655,16 +1900,43 @@ The following implementation details remain intentionally unresolved until hosti
 - Final supported Attachment file types
 - Exact duplicate-prevention rule for Committee reporting periods
 - PDF storage location
-- Whether additional audit-history tables are required
 - Production deployment architecture
+- Exact VP-to-Committee routing/configuration method
+- Administrative correction process for a locked Report, if required
 
-These items do not prevent implementation of the approved logical data model.
+The following decisions are now resolved:
+
+```text
+Production database platform:
+PostgreSQL 17
+
+Report workflow:
+Draft
+Submitted
+Reviewed
+Approved
+Returned for Changes
+Locked
+Archived
+Other
+
+Workflow audit history:
+ReportStatusHistory is required.
+
+Report locking:
+Only the President may lock an approved Report under the current workflow.
+
+PDF generation:
+Available only after the President locks the Report.
+```
+
+These remaining open items do not prevent implementation of the approved Phase 1 PostgreSQL data model.
 
 ---
 
-# 24. Schema Design Summary
+# 25. Schema Design Summary
 
-MACReporting uses a version-aware relational design intended to preserve historical reporting accuracy.
+MACReporting uses a version-aware relational design intended to preserve historical reporting accuracy while supporting a multi-user approval workflow.
 
 The central structure is:
 
@@ -1678,7 +1950,8 @@ User
                     +---- Report
                            |
                            ├── Answer
-                           └── Attachment
+                           ├── Attachment
+                           └── ReportStatusHistory
 
 ReportTemplate
       |
@@ -1701,8 +1974,30 @@ An `Answer` references the exact `QuestionVersion` answered.
 
 `UserCommittee` preserves Committee membership and Committee-role history.
 
+`ReportStatusHistory` preserves every workflow transition without overwriting previous activity.
+
 `Attachment` stores metadata and an external storage reference for Report-related files.
 
-This structure allows MACReporting to change over time without changing the historical meaning of previously submitted Reports.
+The Report itself remains the working and reviewable record throughout the workflow.
 
-Phase 2 analytics can then consume this structured Phase 1 data without redesigning or overwriting the historical reporting model.
+PDF output is not a parallel working copy.
+
+Instead:
+
+```text
+Create/Edit Report
+        ↓
+Review HTML Report
+        ↓
+Submit
+        ↓
+VP Review
+        ↓
+VP Approval
+        ↓
+President Lock
+        ↓
+Generate Final PDF
+```
+
+This structure allows MACReporting to change over time without changing the historical meaning of previously submitted Reports and provides a stable PostgreSQL foundation for future Phase 2 analytics.
