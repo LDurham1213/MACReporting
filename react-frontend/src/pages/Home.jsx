@@ -6,10 +6,11 @@ import {
   FaChartBar,
   FaQuestionCircle,
   FaSignOutAlt,
-  FaCalendarAlt
+  FaCalendarAlt,
+  FaClipboardCheck
 } from "react-icons/fa";
 
-function Home({ onSelectReportType }) {
+function Home({ onSelectReportType, onApprovals }) {
   return (
     <div className="home-layout">
       {/* SIDEBAR */}
@@ -30,6 +31,11 @@ function Home({ onSelectReportType }) {
           <button className="nav-item">
             <span><FaFileAlt /></span>
             My Reports
+          </button>
+
+          <button className="nav-item" onClick={onApprovals}>
+            <span><FaClipboardCheck /></span>
+            Approvals
           </button>
 
           <button className="nav-item">

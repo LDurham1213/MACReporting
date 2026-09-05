@@ -3,26 +3,28 @@ import ReportTemplate from "./components/ReportTemplate";
 import Home from "./pages/Home";
 import ReportOptions from "./pages/ReportOptions";
 import CommitteeReportEntry from "./pages/CommitteeReportEntry";
+import PostMortemReportEntry from "./pages/PostMortemReportEntry";
+import Approvals from "./pages/Approvals";
 import "./App.css";
 
 const PAGE_STORAGE_KEY = "macreporting_current_page";
 const REPORT_TYPE_STORAGE_KEY = "macreporting_selected_report_type";
 const COMMITTEE_REPORT_STORAGE_KEY = "macreporting_committee_report_id";
+const POSTMORTEM_REPORT_STORAGE_KEY = "macreporting_postmortem_report_id";
+const REVIEWER_USER_STORAGE_KEY = "macreporting_reviewer_user_id";
+const LOCK_USER_STORAGE_KEY = "macreporting_lock_user_id";
 
 function App() {
   // =========================================================
   // STATE
   // =========================================================
-
   // Application Navigation State
   const [currentPage, setCurrentPage] = useState(
     () => localStorage.getItem(PAGE_STORAGE_KEY) || "home"
   );
-
   const [selectedReportType, setSelectedReportType] = useState(
     () => localStorage.getItem(REPORT_TYPE_STORAGE_KEY) || null
   );
-
   // Report Template State
   const [reportTemplates, setReportTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
@@ -30,7 +32,6 @@ function App() {
   const [editingTemplateId, setEditingTemplateId] = useState(null);
   const [templateName, setTemplateName] = useState("");
   const [templateDescription, setTemplateDescription] = useState("");
-
   // Question State
   const [questions, setQuestions] = useState([]);
   const [showQuestionForm, setShowQuestionForm] = useState(false);
@@ -41,15 +42,12 @@ function App() {
   const [questionRequired, setQuestionRequired] = useState(0);
   const [questionOrder, setQuestionOrder] = useState("");
   const [addingNewSection, setAddingNewSection] = useState(false);
-
   // =========================================================
   // PERSIST NAVIGATION STATE
   // =========================================================
-
   useEffect(() => {
     localStorage.setItem(PAGE_STORAGE_KEY, currentPage);
   }, [currentPage]);
-
   useEffect(() => {
     if (selectedReportType) {
       localStorage.setItem(REPORT_TYPE_STORAGE_KEY, selectedReportType);
@@ -57,49 +55,106 @@ function App() {
       localStorage.removeItem(REPORT_TYPE_STORAGE_KEY);
     }
   }, [selectedReportType]);
-
   // =========================================================
   // LOAD REPORT TEMPLATES WHEN REACT STARTS
   // =========================================================
-
   useEffect(() => {
-    fetch("http://127.0.0.1:5000/report-templates")
+    fetch("http://127.0.0.1:5001/report-templates")
       .then(response => response.json())
       .then(data => setReportTemplates(data))
       .catch(error => console.error("Error loading report templates:", error));
   }, []);
-
   // =========================================================
   // NAVIGATION FUNCTIONS
   // =========================================================
-
   function selectReportType(reportType) {
     setSelectedReportType(reportType);
     setCurrentPage("report-options");
   }
 
   function goHome() {
+    localStorage.removeItem(REVIEWER_USER_STORAGE_KEY);
+    localStorage.removeItem(LOCK_USER_STORAGE_KEY);
     setSelectedReportType(null);
     setCurrentPage("home");
   }
 
-  function createNewReport() {
-    if (selectedReportType === "committee") {
-      localStorage.removeItem(COMMITTEE_REPORT_STORAGE_KEY);
+  function goToApprovals() {
+    setSelectedReportType(null);
+    setCurrentPage("approvals");
+  }
+
+  function openApprovalReport(report, reviewerUserId) {
+    const reportType =
+      Number(report.report_template_id) === 2 ? "post-mortem" : "committee";
+
+    localStorage.removeItem(LOCK_USER_STORAGE_KEY);
+    localStorage.setItem(REVIEWER_USER_STORAGE_KEY, String(reviewerUserId));
+
+    setSelectedReportType(reportType);
+
+    if (reportType === "committee") {
+      localStorage.setItem(COMMITTEE_REPORT_STORAGE_KEY, report.report_id);
       setCurrentPage("committee-entry");
-    } else {
-      console.log("Post-Mortem entry screen not built yet");
+      return;
+    }
+
+    localStorage.setItem(POSTMORTEM_REPORT_STORAGE_KEY, report.report_id);
+    setCurrentPage("postmortem-entry");
+  }
+
+  function openLockReport(report, lockUserId) {
+    const reportType =
+      Number(report.report_template_id) === 2 ? "post-mortem" : "committee";
+
+    localStorage.removeItem(REVIEWER_USER_STORAGE_KEY);
+    localStorage.setItem(LOCK_USER_STORAGE_KEY, String(lockUserId));
+
+    setSelectedReportType(reportType);
+
+    if (reportType === "committee") {
+      localStorage.setItem(COMMITTEE_REPORT_STORAGE_KEY, report.report_id);
+      setCurrentPage("committee-entry");
+      return;
+    }
+
+    localStorage.setItem(POSTMORTEM_REPORT_STORAGE_KEY, report.report_id);
+    setCurrentPage("postmortem-entry");
+  }
+
+  function createNewReport() {
+    localStorage.removeItem(LOCK_USER_STORAGE_KEY);
+    localStorage.removeItem(REVIEWER_USER_STORAGE_KEY);
+    if (selectedReportType === "committee") {
+      localStorage.removeItem("macreporting_committee_report_id");
+      setCurrentPage("committee-entry");
+      return;
+    }
+    if (selectedReportType === "post-mortem") {
+      localStorage.removeItem(POSTMORTEM_REPORT_STORAGE_KEY);
+      setCurrentPage("postmortem-entry");
     }
   }
 
+  function openExistingReport(reportId) {
+    localStorage.removeItem(LOCK_USER_STORAGE_KEY);
+    localStorage.removeItem(REVIEWER_USER_STORAGE_KEY);
+    if (selectedReportType === "committee") {
+      localStorage.setItem(COMMITTEE_REPORT_STORAGE_KEY, reportId);
+      setCurrentPage("committee-entry");
+      return;
+    }
+    if (selectedReportType === "post-mortem") {
+      localStorage.setItem(POSTMORTEM_REPORT_STORAGE_KEY, reportId);
+      setCurrentPage("postmortem-entry");
+    }
+  }
   function goToReportOptions() {
     setCurrentPage("report-options");
   }
-
   // =========================================================
   // REPORT TEMPLATE FUNCTIONS
   // =========================================================
-
   function loadQuestions(template) {
     setShowTemplateForm(false);
     setShowQuestionForm(false);
@@ -107,13 +162,11 @@ function App() {
     setEditingQuestionId(null);
     setAddingNewSection(false);
     setSelectedTemplate(template);
-
-    fetch(`http://127.0.0.1:5000/report-templates/${template.id}/questions`)
+    fetch(`http://127.0.0.1:5001/report-templates/${template.id}/questions`)
       .then(response => response.json())
       .then(data => setQuestions(data))
       .catch(error => console.error("Error loading questions:", error));
   }
-
   function editTemplate() {
     setEditingTemplateId(selectedTemplate.id);
     setTemplateName(selectedTemplate.name);
@@ -121,16 +174,11 @@ function App() {
     setShowQuestionForm(false);
     setShowTemplateForm(true);
   }
-
-  function saveTemplate(event) {
-    event.preventDefault();
-
+  function saveTemplate(event) {event.preventDefault();
     const url = editingTemplateId
-      ? `http://127.0.0.1:5000/report-templates/${editingTemplateId}`
-      : "http://127.0.0.1:5000/report-templates";
-
+      ? `http://127.0.0.1:5001/report-templates/${editingTemplateId}`
+      : "http://127.0.0.1:5001/report-templates";
     const method = editingTemplateId ? "PUT" : "POST";
-
     fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
@@ -151,7 +199,6 @@ function App() {
         } else {
           setReportTemplates([...reportTemplates, savedTemplate]);
         }
-
         setTemplateName("");
         setTemplateDescription("");
         setEditingTemplateId(null);
@@ -159,9 +206,8 @@ function App() {
       })
       .catch(error => console.error("Error saving template:", error));
   }
-
   function deleteTemplate(templateId) {
-    fetch(`http://127.0.0.1:5000/report-templates/${templateId}`, {
+    fetch(`http://127.0.0.1:5001/report-templates/${templateId}`, {
       method: "DELETE"
     })
       .then(response => response.json())
@@ -176,11 +222,9 @@ function App() {
       })
       .catch(error => console.error("Error deleting template:", error));
   }
-
   // =========================================================
   // QUESTION FUNCTIONS
   // =========================================================
-
   function editQuestion(question) {
     setEditingQuestionId(question.id);
     setQuestionSection(question.section_name);
@@ -191,16 +235,11 @@ function App() {
     setAddingNewSection(false);
     setShowQuestionForm(true);
   }
-
-  function saveQuestion(event) {
-    event.preventDefault();
-
+  function saveQuestion(event) {event.preventDefault();
     const url = editingQuestionId
-      ? `http://127.0.0.1:5000/questions/${editingQuestionId}`
-      : "http://127.0.0.1:5000/questions";
-
+      ? `http://127.0.0.1:5001/questions/${editingQuestionId}`
+      : "http://127.0.0.1:5001/questions";
     const method = editingQuestionId ? "PUT" : "POST";
-
     fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
@@ -217,14 +256,11 @@ function App() {
       .then(savedQuestion => {
         if (editingQuestionId) {
           setQuestions(
-            questions.map(question =>
-              question.id === editingQuestionId ? savedQuestion : question
-            )
+            questions.map(question => question.id === editingQuestionId ? savedQuestion : question)
           );
         } else {
           setQuestions([...questions, savedQuestion]);
         }
-
         setEditingQuestionId(null);
         setQuestionSection("");
         setQuestionText("");
@@ -236,9 +272,8 @@ function App() {
       })
       .catch(error => console.error("Error saving question:", error));
   }
-
   function deleteQuestion(questionId) {
-    fetch(`http://127.0.0.1:5000/questions/${questionId}`, {
+    fetch(`http://127.0.0.1:5001/questions/${questionId}`, {
       method: "DELETE"
     })
       .then(response => response.json())
@@ -249,11 +284,9 @@ function App() {
       })
       .catch(error => console.error("Error deleting question:", error));
   }
-
   // =========================================================
   // SECTION NAMES
   // =========================================================
-
   const sectionNames = [
     ...new Set(
       questions
@@ -261,33 +294,54 @@ function App() {
         .filter(section => section)
     )
   ];
-
   // =========================================================
   // PAGE ROUTING
   // =========================================================
-
   if (currentPage === "home") {
-    return <Home onSelectReportType={selectReportType} />;
+    return <Home onSelectReportType={selectReportType} onApprovals={goToApprovals} />;
   }
-
   if (currentPage === "report-options") {
     return (
       <ReportOptions
-        selectedReportType={selectedReportType}
-        onCreateNew={createNewReport}
-        onBack={goHome}
+      selectedReportType={selectedReportType}
+      onCreateNew={createNewReport}
+      onOpenExisting={openExistingReport}
+      onBack={goHome}
+      onApprovals={goToApprovals}
+            />
+          );
+  }
+  if (currentPage === "approvals") {
+    return (
+      <Approvals
+        onHome={goHome}
+        onOpenReport={openApprovalReport}
+        onOpenLockReport={openLockReport}
       />
     );
   }
 
   if (currentPage === "committee-entry") {
-    return (<CommitteeReportEntry onBack={goToReportOptions} onHome={goHome}/>);
+    return (
+      <CommitteeReportEntry
+        onBack={goToReportOptions}
+        onHome={goHome}
+        onApprovals={goToApprovals}
+      />
+          );
   }
-
+  if (currentPage === "postmortem-entry") {
+    return (
+      <PostMortemReportEntry
+        onBack={goToReportOptions}
+        onHome={goHome}
+        onApprovals={goToApprovals}
+      />
+    );
+  }
   // =========================================================
   // JSX - REPORT TEMPLATE ADMINISTRATION
   // =========================================================
-
   return (
     <div className="app">
       <header className="app-header">
@@ -297,28 +351,25 @@ function App() {
           <p className="header-description">Report Template Administration</p>
         </div>
       </header>
-
       <main className="dashboard">
         <aside className="template-panel">
           <div className="panel-heading">
             <h2>Report Templates</h2>
             <span>{reportTemplates.length}</span>
           </div>
-
           <div className="template-list">
             {reportTemplates.map(template => (
               <ReportTemplate
-                key={template.id}
-                template={template}
-                selected={selectedTemplate?.id === template.id}
-                onViewQuestions={loadQuestions}
-              />
+              key={template.id}
+              template={template}
+              selected={selectedTemplate?.id === template.id}
+              onViewQuestions={loadQuestions}
+                            />
             ))}
           </div>
-
           <button
-            className="primary-button"
-            onClick={() => {
+              className="primary-button"
+              onClick={() => {
               setEditingTemplateId(null);
               setTemplateName("");
               setTemplateDescription("");
@@ -330,13 +381,11 @@ function App() {
             + Add Template
           </button>
         </aside>
-
         <section className="detail-panel">
           {showTemplateForm ? (
             <div className="template-form-panel">
               <p className="section-label">Template Management</p>
               <h2>{editingTemplateId ? "Edit Report Template" : "Add Report Template"}</h2>
-
               <form onSubmit={saveTemplate}>
                 <div className="form-group">
                   <label>Name</label>
@@ -347,7 +396,6 @@ function App() {
                     required
                   />
                 </div>
-
                 <div className="form-group">
                   <label>Description</label>
                   <input
@@ -356,20 +404,18 @@ function App() {
                     onChange={event => setTemplateDescription(event.target.value)}
                   />
                 </div>
-
                 <div className="action-buttons">
                   <button type="submit" className="primary-button">
                     {editingTemplateId ? "Update Template" : "Save Template"}
                   </button>
-
                   <button
-                    type="button"
-                    className="delete-button"
-                    onClick={() => {
-                      setShowTemplateForm(false);
-                      setEditingTemplateId(null);
-                      setTemplateName("");
-                      setTemplateDescription("");
+                      type="button"
+                      className="delete-button"
+                      onClick={() => {
+                        setShowTemplateForm(false);
+                        setEditingTemplateId(null);
+                        setTemplateName("");
+                        setTemplateDescription("");
                     }}
                   >
                     Cancel
@@ -385,25 +431,20 @@ function App() {
                   <h2>{selectedTemplate.name}</h2>
                   <p>{selectedTemplate.description}</p>
                 </div>
-
                 <div className="action-buttons">
                   <button className="edit-button" onClick={editTemplate}>Edit</button>
                   <button
-                    className="delete-button"
-                    onClick={() => deleteTemplate(selectedTemplate.id)}
-                  >
-                    Delete
-                  </button>
+                      className="delete-button"
+                      onClick={() => deleteTemplate(selectedTemplate.id)}
+                  >Delete</button>
                 </div>
               </div>
-
               <div className="questions-section">
                 <div className="questions-heading">
                   <div>
                     <p className="section-label">Report Configuration</p>
                     <h3>Questions</h3>
                   </div>
-
                   <button
                     className="primary-button"
                     onClick={() => {
@@ -413,7 +454,6 @@ function App() {
                       setQuestionType("");
                       setQuestionRequired(0);
                       setAddingNewSection(false);
-
                       const nextOrder =
                         questions.length > 0
                           ? Math.max(
@@ -422,7 +462,6 @@ function App() {
                               )
                             ) + 1
                           : 1;
-
                       setQuestionOrder(nextOrder);
                       setShowQuestionForm(true);
                     }}
@@ -430,16 +469,13 @@ function App() {
                     + Add Question
                   </button>
                 </div>
-
                 {showQuestionForm ? (
                   <div className="question-form-panel">
                     <p className="section-label">Question Management</p>
                     <h3>{editingQuestionId ? "Edit Question" : "Add Question"}</h3>
-
                     <form onSubmit={saveQuestion}>
                       <div className="form-group">
                         <label>Section Name</label>
-
                         {sectionNames.length === 0 || addingNewSection ? (
                           <input
                             type="text"
@@ -469,7 +505,6 @@ function App() {
                           </select>
                         )}
                       </div>
-
                       <div className="form-group">
                         <label>Question</label>
                         <textarea
@@ -478,7 +513,6 @@ function App() {
                           required
                         />
                       </div>
-
                       <div className="form-group">
                         <label>Question Type</label>
                         <select
@@ -493,7 +527,6 @@ function App() {
                           <option value="date">Date</option>
                         </select>
                       </div>
-
                       <div className="form-group">
                         <label>Required</label>
                         <select
@@ -504,7 +537,6 @@ function App() {
                           <option value={1}>Yes</option>
                         </select>
                       </div>
-
                       <div className="form-group">
                         <label>Display Order</label>
                         <input
@@ -513,12 +545,10 @@ function App() {
                           onChange={event => setQuestionOrder(event.target.value)}
                         />
                       </div>
-
                       <div className="action-buttons">
                         <button type="submit" className="primary-button">
                           {editingQuestionId ? "Update Question" : "Save Question"}
                         </button>
-
                         <button
                           type="button"
                           className="delete-button"
@@ -546,13 +576,11 @@ function App() {
                       <span>Type</span>
                       <span>Actions</span>
                     </div>
-
                     {questions.map(question => (
                       <div className="question-row" key={question.id}>
                         <span className="question-text">{question.question_text}</span>
                         <span>{question.section_name}</span>
                         <span>{question.question_type}</span>
-
                         <span className="row-actions">
                           <button
                             className="text-button"
@@ -560,7 +588,6 @@ function App() {
                           >
                             Edit
                           </button>
-
                           <button
                             className="text-button delete-text"
                             onClick={() => deleteQuestion(question.id)}
@@ -588,5 +615,4 @@ function App() {
     </div>
   );
 }
-
 export default App;

@@ -1,9 +1,11 @@
 # SQLite database files
 *.db
 *.db-journal
+*.db copy
 
 # Generated export files
 database/macreporting_export.json
+archive/sqlite/macreporting_export.json
 
 # Python cache files
 __pycache__/

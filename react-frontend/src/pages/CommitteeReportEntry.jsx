@@ -10,10 +10,12 @@ import {
   FaArrowLeft
 } from "react-icons/fa";
 
-const API_BASE = "http://127.0.0.1:5000";
+const API_BASE = "http://127.0.0.1:5001";
 const REPORT_STORAGE_KEY = "macreporting_committee_report_id";
+const REVIEWER_USER_STORAGE_KEY = "macreporting_reviewer_user_id";
+const LOCK_USER_STORAGE_KEY = "macreporting_lock_user_id";
 
-const sections = [
+const baseSections = [
   "Report Details",
   "Program Overview",
   "Program Summary",
@@ -44,7 +46,34 @@ const questionMap = {
   resourcesNeeded: { questionId: 14, version: 1 }
 };
 
+const months = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December"
+];
+
+const currentYear = new Date().getFullYear();
+const reportingYears = Array.from(
+  { length: 11 },
+  (_, index) => currentYear - 5 + index
+);
+
 const initialReportData = {
+  reportDetails: {
+    reportingMonth: "",
+    reportingYear: String(currentYear),
+    submittedByUserId: "",
+    committeeId: ""
+  },
   programOverview: {
     eventName: "",
     date: "",
@@ -92,15 +121,52 @@ const initialReportData = {
 
 function CommitteeReportEntry({ onBack, onHome }) {
   const [reportId, setReportId] = useState(null);
+  const [reportStatus, setReportStatus] = useState("draft");
+  const [statusHistory, setStatusHistory] = useState([]);
   const [reportData, setReportData] = useState(initialReportData);
-  const [currentSection, setCurrentSection] = useState("Program Overview");
-  const [completedSections, setCompletedSections] = useState(["Report Details"]);
+  const [currentSection, setCurrentSection] = useState("Report Details");
+  const [completedSections, setCompletedSections] = useState([]);
   const [validationMessage, setValidationMessage] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
   const [loadingDraft, setLoadingDraft] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [committees, setCommittees] = useState([]);
+  const [reviewerUserId] = useState(
+    () => localStorage.getItem(REVIEWER_USER_STORAGE_KEY) || ""
+  );
+  const [reviewComments, setReviewComments] = useState("");
+  const [reviewMessage, setReviewMessage] = useState("");
+  const [reviewError, setReviewError] = useState("");
+  const [lockUserId] = useState(
+    () => localStorage.getItem(LOCK_USER_STORAGE_KEY) || ""
+  );
+  const [lockComments, setLockComments] = useState("");
+  const [lockMessage, setLockMessage] = useState("");
+  const [lockError, setLockError] = useState("");
+  const isReadOnly = !["draft", "returned_for_changes"].includes(reportStatus);
+  const isReviewerView = reportStatus === "submitted" && Boolean(reviewerUserId);
+  const isLockView = reportStatus === "approved" && Boolean(lockUserId);
+  const sections = isReviewerView
+    ? [...baseSections, "Reviewer Action"]
+    : isLockView
+      ? [...baseSections, "Finalization Action"]
+      : baseSections;
+  const reviewer = users.find(
+    user => String(user.user_id) === String(reviewerUserId)
+  );
+  const reviewerName = reviewer
+    ? `${reviewer.first_name || ""} ${reviewer.last_name || ""}`.trim()
+    : "Authorized Reviewer";
+  const finalizer = users.find(
+    user => String(user.user_id) === String(lockUserId)
+  );
+  const finalizerName = finalizer
+    ? `${finalizer.first_name || ""} ${finalizer.last_name || ""}`.trim()
+    : "Authorized Finalizer";
 
   const {
+    reportDetails,
     programOverview,
     programSummary,
     goals,
@@ -113,13 +179,31 @@ function CommitteeReportEntry({ onBack, onHome }) {
   } = reportData;
 
   useEffect(() => {
-    const storedReportId = localStorage.getItem(REPORT_STORAGE_KEY);
+    async function initializeReport() {
+      try {
+        const [userData, committeeData] = await Promise.all([
+          apiRequest("/users"),
+          apiRequest("/committees")
+        ]);
 
-    if (storedReportId) {
-      loadDraft(Number(storedReportId));
-    } else {
-      setLoadingDraft(false);
+        setUsers(userData);
+        setCommittees(committeeData);
+
+        const storedReportId = localStorage.getItem(REPORT_STORAGE_KEY);
+
+        if (storedReportId) {
+          await loadDraft(Number(storedReportId));
+        } else {
+          setLoadingDraft(false);
+        }
+      } catch (error) {
+        console.error("Error initializing report:", error);
+        setValidationMessage("Unable to load report setup data.");
+        setLoadingDraft(false);
+      }
     }
+
+    initializeReport();
   }, []);
 
   async function apiRequest(url, options = {}) {
@@ -138,6 +222,20 @@ function CommitteeReportEntry({ onBack, onHome }) {
     }
 
     return data;
+  }
+
+  function updateReportDetails(field, value) {
+    setReportData(current => ({
+      ...current,
+      reportDetails: {
+        ...current.reportDetails,
+        [field]: value
+      }
+    }));
+
+    if (validationMessage) {
+      setValidationMessage("");
+    }
   }
 
   function updateReportField(field, value) {
@@ -300,7 +398,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
       body: JSON.stringify({
         section_name: section,
         completed: true,
-        completed_by_user_id: 1
+        completed_by_user_id: Number(reportDetails.submittedByUserId)
       })
     });
 
@@ -311,9 +409,51 @@ function CommitteeReportEntry({ onBack, onHome }) {
     );
   }
 
+  function getReportingPeriod() {
+    if (!reportDetails.reportingMonth || !reportDetails.reportingYear) {
+      return null;
+    }
+
+    const monthNumber = months.indexOf(reportDetails.reportingMonth) + 1;
+    return `${reportDetails.reportingYear}-${String(monthNumber).padStart(2, "0")}-01`;
+  }
+
+  function selectedCommitteeName() {
+    const committee = committees.find(
+      item => String(item.committee_id) === String(reportDetails.committeeId)
+    );
+
+    return committee?.committee_name || "";
+  }
+
+  function selectedSubmitterName() {
+    const user = users.find(
+      item => String(item.user_id) === String(reportDetails.submittedByUserId)
+    );
+
+    if (!user) {
+      return "";
+    }
+
+    return `${user.first_name || ""} ${user.last_name || ""}`.trim();
+  }
+
+  function validateReportDetails() {
+    return (
+      reportDetails.reportingMonth &&
+      reportDetails.reportingYear &&
+      reportDetails.submittedByUserId &&
+      reportDetails.committeeId
+    );
+  }
+
   async function ensureDraft() {
     if (reportId) {
       return reportId;
+    }
+
+    if (!validateReportDetails()) {
+      throw new Error("Please complete all required Report Details fields.");
     }
 
     const report = await apiRequest("/reports", {
@@ -321,23 +461,35 @@ function CommitteeReportEntry({ onBack, onHome }) {
       body: JSON.stringify({
         report_template_id: 1,
         report_template_version: 1,
-        committee_id: 1,
-        created_by_user_id: 1,
+        committee_id: Number(reportDetails.committeeId),
+        created_by_user_id: Number(reportDetails.submittedByUserId),
         report_title:
           programOverview.eventName.trim() ||
           "Committee Report Draft",
-        reporting_period: "2026-09-01",
+        reporting_period: getReportingPeriod(),
         event_date: programOverview.date || null
       })
     });
 
     setReportId(report.report_id);
-    localStorage.setItem(
-      REPORT_STORAGE_KEY,
-      report.report_id
-    );
+    localStorage.setItem(REPORT_STORAGE_KEY, report.report_id);
 
     return report.report_id;
+  }
+
+  async function saveReportDetails(draftId) {
+    await apiRequest(`/reports/${draftId}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        report_title:
+          programOverview.eventName.trim() ||
+          "Committee Report Draft",
+        reporting_period: getReportingPeriod(),
+        event_date: programOverview.date || null,
+        committee_id: Number(reportDetails.committeeId),
+        created_by_user_id: Number(reportDetails.submittedByUserId)
+      })
+    });
   }
 
   async function saveAnswer(draftId, fieldName, value) {
@@ -353,7 +505,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
         question_id: question.questionId,
         question_version: question.version,
         answer_value: value ?? "",
-        answered_by: 1,
+        answered_by: Number(reportDetails.submittedByUserId),
         notes: null
       })
     });
@@ -414,8 +566,10 @@ function CommitteeReportEntry({ onBack, onHome }) {
         report_title:
           programOverview.eventName.trim() ||
           "Committee Report Draft",
-        reporting_period: "2026-09-01",
-        event_date: programOverview.date || null
+        reporting_period: getReportingPeriod(),
+        event_date: programOverview.date || null,
+        committee_id: Number(reportDetails.committeeId),
+        created_by_user_id: Number(reportDetails.submittedByUserId)
       })
     });
   }
@@ -604,6 +758,10 @@ function CommitteeReportEntry({ onBack, onHome }) {
   async function saveCurrentSection() {
     const draftId = await ensureDraft();
 
+    if (currentSection === "Report Details") {
+      await saveReportDetails(draftId);
+    }
+
     if (currentSection === "Program Overview") {
       await saveProgramOverview(draftId);
     }
@@ -685,7 +843,13 @@ function CommitteeReportEntry({ onBack, onHome }) {
         `/reports/${id}/section-progress`
       );
 
+      const history = await apiRequest(
+        `/reports/${id}/status-history`
+      );
+
+      setStatusHistory(history);
       setReportId(id);
+      setReportStatus(report.status || "draft");
 
       localStorage.setItem(
         REPORT_STORAGE_KEY,
@@ -701,6 +865,17 @@ function CommitteeReportEntry({ onBack, onHome }) {
 
       const loadedData = {
         ...initialReportData,
+
+        reportDetails: {
+          reportingMonth: report.reporting_period
+            ? months[new Date(report.reporting_period).getUTCMonth()]
+            : "",
+          reportingYear: report.reporting_period
+            ? String(new Date(report.reporting_period).getUTCFullYear())
+            : String(currentYear),
+          submittedByUserId: String(report.created_by_user_id || ""),
+          committeeId: String(report.committee_id || "")
+        },
 
         programOverview: {
           eventName:
@@ -829,13 +1004,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
           .filter(item => item.completed)
           .map(item => item.section_name);
 
-      setCompletedSections([
-        "Report Details",
-        ...savedCompletedSections.filter(
-          section =>
-            section !== "Report Details"
-        )
-      ]);
+      setCompletedSections(savedCompletedSections);
     } catch (error) {
       console.error(
         "Error loading draft:",
@@ -851,6 +1020,13 @@ function CommitteeReportEntry({ onBack, onHome }) {
   }
 
   async function handleSaveDraft() {
+    if (currentSection === "Report Details" && !validateReportDetails()) {
+      setValidationMessage(
+        "Please complete all required Report Details fields before saving."
+      );
+      return;
+    }
+
     try {
       setValidationMessage("");
       await saveCurrentSection();
@@ -862,6 +1038,13 @@ function CommitteeReportEntry({ onBack, onHome }) {
   }
 
   async function handleSaveAndContinue() {
+    if (currentSection === "Report Details" && !validateReportDetails()) {
+      setValidationMessage(
+        "Please complete all required fields before continuing."
+      );
+      return;
+    }
+
     if (
       currentSection === "Program Overview"
     ) {
@@ -869,8 +1052,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
         !programOverview.eventName.trim() ||
         !programOverview.date ||
         !programOverview.time.trim() ||
-        !programOverview.location.trim() ||
-        !programOverview.programThrust
+        !programOverview.location.trim()
       ) {
         setValidationMessage(
           "Please complete all required fields before continuing."
@@ -921,6 +1103,9 @@ function CommitteeReportEntry({ onBack, onHome }) {
       );
 
       const nextSection = {
+        "Report Details":
+          "Program Overview",
+
         "Program Overview":
           "Program Summary",
 
@@ -963,6 +1148,116 @@ function CommitteeReportEntry({ onBack, onHome }) {
     }
   }
 
+  async function handleSubmitReport() {
+    if (!reportId) {
+      setValidationMessage("Please save the report before submitting.");
+      return;
+    }
+
+    try {
+      setValidationMessage("");
+
+      const submittedReport = await apiRequest(
+        `/reports/${reportId}/submit`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            changed_by_user_id: Number(reportDetails.submittedByUserId)
+          })
+        }
+      );
+
+      setReportStatus(submittedReport.status);
+      setSaveMessage("Report submitted successfully.");
+
+      setTimeout(() => {
+        setSaveMessage("");
+      }, 2500);
+    } catch (error) {
+      setValidationMessage(error.message);
+    }
+  }
+
+  async function handleReturnForChanges() {
+    if (!reviewComments.trim()) {
+      setReviewError("A comment is required when returning a report for changes.");
+      return;
+    }
+
+    try {
+      setReviewError("");
+      setReviewMessage("");
+
+      const returnedReport = await apiRequest(
+        `/reports/${reportId}/return`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            changed_by_user_id: Number(reviewerUserId),
+            comments: reviewComments.trim()
+          })
+        }
+      );
+
+      setReportStatus(returnedReport.status);
+      setReviewComments("");
+      setReviewMessage("Report returned for changes.");
+    } catch (error) {
+      setReviewError(error.message);
+    }
+  }
+
+  async function handleApproveReport() {
+    try {
+      setReviewError("");
+      setReviewMessage("");
+
+      const approvedReport = await apiRequest(
+        `/reports/${reportId}/approve`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            changed_by_user_id: Number(reviewerUserId),
+            comments: reviewComments.trim() || null
+          })
+        }
+      );
+
+      setReportStatus(approvedReport.status);
+      setReviewComments("");
+      setReviewMessage("Report approved.");
+    } catch (error) {
+      setReviewError(error.message);
+    }
+  }
+
+  async function handleLockReport() {
+    if (!reportId) {
+      setLockError("Report ID is missing.");
+      return;
+    }
+
+    try {
+      setLockError("");
+      setLockMessage("");
+
+      const lockedReport = await apiRequest(`/reports/${reportId}/lock`, {
+        method: "POST",
+        body: JSON.stringify({
+          changed_by_user_id: Number(lockUserId),
+          comments: lockComments.trim() || null
+        })
+      });
+
+      setReportStatus(lockedReport.status);
+      setLockComments("");
+      setLockMessage("Report locked successfully.");
+      setCurrentSection("Review");
+    } catch (error) {
+      setLockError(error.message);
+    }
+  }
+
   function handleSectionChange(section) {
     setValidationMessage("");
     setCurrentSection(section);
@@ -995,6 +1290,20 @@ function CommitteeReportEntry({ onBack, onHome }) {
       ? value
       : "—";
   }
+
+  function formatHistoryDate(value) {
+    if (!value) return "";
+
+    return new Intl.DateTimeFormat("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric"
+    }).format(new Date(value));
+  }
+
+  const latestReturn = statusHistory.find(
+    item => item.to_status === "returned_for_changes"
+  );
 
   function displayCurrency(value) {
     return `$${(
@@ -1060,9 +1369,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                   onClick={handleBack}
                 >
                   <FaArrowLeft />
-                  <span>
-                    Report Options
-                  </span>
+                  <span>Reports</span>
                 </button>
               </div>
             )}
@@ -1075,7 +1382,14 @@ function CommitteeReportEntry({ onBack, onHome }) {
           <div className="entry-report-title">
             <h1>Committee Report</h1>
             <p>
-              August 2026 • Social Action Committee
+              {[
+                reportDetails.reportingMonth && reportDetails.reportingYear
+                  ? `${reportDetails.reportingMonth} ${reportDetails.reportingYear}`
+                  : "",
+                selectedCommitteeName()
+              ]
+                .filter(Boolean)
+                .join(" • ") || "New Committee Report"}
             </p>
           </div>
         </div>
@@ -1102,9 +1416,8 @@ function CommitteeReportEntry({ onBack, onHome }) {
 
           <div className="report-status">
             <span>Status:</span>
-
-            <span className="status-badge draft">
-              DRAFT
+            <span className={`status-badge ${reportStatus}`}>
+              {reportStatus.replaceAll("_", " ").toUpperCase()}
             </span>
           </div>
         </div>
@@ -1177,13 +1490,147 @@ function CommitteeReportEntry({ onBack, onHome }) {
         </aside>
 
         <main className="entry-content">
+          {reportStatus === "returned_for_changes" && latestReturn && (
+            <div className="returned-report-banner">
+              <h3>Returned for Changes</h3>
+              <p>
+                {`${latestReturn.first_name || ""} ${latestReturn.last_name || ""}`.trim() || "The reviewer"} returned this report
+                {latestReturn.changed_at ? ` on ${formatHistoryDate(latestReturn.changed_at)}.` : "."}
+              </p>
+              <p><strong>Reviewer Comments:</strong> {latestReturn.comments || "No comments provided."}</p>
+            </div>
+          )}
+
+          {isReadOnly && (
+            <div className="form-save-message">
+              This report is {reportStatus.replaceAll("_", " ")} and is read-only.
+            </div>
+          )}
           {saveMessage && (
             <div className="form-save-message">
               {saveMessage}
             </div>
           )}
 
-          {currentSection ===
+          {currentSection === "Report Details" ? (
+            <>
+              <h2>REPORT DETAILS</h2>
+
+              <form className="entry-form">
+                {validationMessage && (
+                  <div className="form-validation-message">
+                    {validationMessage}
+                  </div>
+                )}
+
+                <div className="entry-form-row">
+                  <div className="entry-form-group">
+                    <label>
+                      Reporting Month <span>*</span>
+                    </label>
+                    <select disabled={isReadOnly}
+                      value={reportDetails.reportingMonth}
+                      onChange={event =>
+                        updateReportDetails("reportingMonth", event.target.value)
+                      }
+                      required
+                    >
+                      <option value="">Select Month</option>
+                      {months.map(month => (
+                        <option key={month} value={month}>
+                          {month}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="entry-form-group">
+                    <label>
+                      Reporting Year <span>*</span>
+                    </label>
+                    <select disabled={isReadOnly}
+                      value={reportDetails.reportingYear}
+                      onChange={event =>
+                        updateReportDetails("reportingYear", event.target.value)
+                      }
+                      required
+                    >
+                      {reportingYears.map(year => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="entry-form-row">
+                  <div className="entry-form-group">
+                    <label>
+                      Submitted By <span>*</span>
+                    </label>
+                    <select disabled={isReadOnly}
+                      value={reportDetails.submittedByUserId}
+                      onChange={event =>
+                        updateReportDetails("submittedByUserId", event.target.value)
+                      }
+                      required
+                    >
+                      <option value="">Select Name</option>
+                      {users.map(user => (
+                        <option key={user.user_id} value={user.user_id}>
+                          {`${user.first_name || ""} ${user.last_name || ""}`.trim()}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="entry-form-group">
+                    <label>
+                      Committee <span>*</span>
+                    </label>
+                    <select disabled={isReadOnly}
+                      value={reportDetails.committeeId}
+                      onChange={event =>
+                        updateReportDetails("committeeId", event.target.value)
+                      }
+                      required
+                    >
+                      <option value="">Select Committee</option>
+                      {committees.map(committee => (
+                        <option
+                          key={committee.committee_id}
+                          value={committee.committee_id}
+                        >
+                          {committee.committee_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="entry-form-actions">
+                  <button
+                    type="button"
+                    className="secondary-action-button"
+                    onClick={handleSaveDraft}
+                    disabled={isReadOnly}
+                  >
+                    Save Draft
+                  </button>
+
+                  <button
+                    type="button"
+                    className="primary-action-button"
+                    onClick={handleSaveAndContinue}
+                    disabled={isReadOnly}
+                  >
+                    Save & Continue →
+                  </button>
+                </div>
+              </form>
+            </>
+          ) : currentSection ===
           "Program Overview" ? (
             <>
               <h2>
@@ -1203,7 +1650,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     <span>*</span>
                   </label>
 
-                  <input
+                  <input disabled={isReadOnly}
                     type="text"
                     value={
                       programOverview.eventName
@@ -1225,7 +1672,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                       Date <span>*</span>
                     </label>
 
-                    <input
+                    <input disabled={isReadOnly}
                       type="date"
                       value={
                         programOverview.date
@@ -1245,7 +1692,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                       Time <span>*</span>
                     </label>
 
-                    <input
+                    <input disabled={isReadOnly}
                       type="text"
                       value={
                         programOverview.time
@@ -1268,7 +1715,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     <span>*</span>
                   </label>
 
-                  <input
+                  <input disabled={isReadOnly}
                     type="text"
                     value={
                       programOverview.location
@@ -1289,7 +1736,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     Internal Partners
                   </label>
 
-                  <input
+                  <input disabled={isReadOnly}
                     type="text"
                     value={
                       programOverview.internalPartners
@@ -1309,7 +1756,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     External Partners
                   </label>
 
-                  <input
+                  <input disabled={isReadOnly}
                     type="text"
                     value={
                       programOverview.externalPartners
@@ -1326,11 +1773,10 @@ function CommitteeReportEntry({ onBack, onHome }) {
 
                 <div className="entry-form-group full-width">
                   <label>
-                    Program Thrust{" "}
-                    <span>*</span>
+                    Program Thrust
                   </label>
 
-                  <select
+                  <select disabled={isReadOnly}
                     value={
                       programOverview.programThrust
                     }
@@ -1340,12 +1786,8 @@ function CommitteeReportEntry({ onBack, onHome }) {
                         event.target.value
                       )
                     }
-                    required
                   >
-                    <option
-                      value=""
-                      disabled
-                    >
+                    <option value="">
                       Select Program Thrust
                     </option>
 
@@ -1376,7 +1818,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     Population Served
                   </label>
 
-                  <input
+                  <input disabled={isReadOnly}
                     type="text"
                     value={
                       programOverview.populationServed
@@ -1396,7 +1838,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     Expected Outcomes
                   </label>
 
-                  <textarea
+                  <textarea disabled={isReadOnly}
                     value={
                       programOverview.expectedOutcomes
                     }
@@ -1418,6 +1860,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     onClick={
                       handleSaveDraft
                     }
+                  disabled={isReadOnly}
                   >
                     Save Draft
                   </button>
@@ -1428,6 +1871,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     onClick={
                       handleSaveAndContinue
                     }
+                  disabled={isReadOnly}
                   >
                     Save & Continue →
                   </button>
@@ -1452,7 +1896,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     <span>*</span>
                   </label>
 
-                  <textarea
+                  <textarea disabled={isReadOnly}
                     value={programSummary}
                     onChange={event =>
                       updateReportField(
@@ -1471,6 +1915,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     type="button"
                     className="secondary-action-button"
                     onClick={handleSaveDraft}
+                    disabled={isReadOnly}
                   >
                     Save Draft
                   </button>
@@ -1481,6 +1926,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     onClick={
                       handleSaveAndContinue
                     }
+                  disabled={isReadOnly}
                   >
                     Save & Continue →
                   </button>
@@ -1504,7 +1950,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     Goals <span>*</span>
                   </label>
 
-                  <textarea
+                  <textarea disabled={isReadOnly}
                     value={goals}
                     onChange={event =>
                       updateReportField(
@@ -1523,6 +1969,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     type="button"
                     className="secondary-action-button"
                     onClick={handleSaveDraft}
+                    disabled={isReadOnly}
                   >
                     Save Draft
                   </button>
@@ -1533,6 +1980,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     onClick={
                       handleSaveAndContinue
                     }
+                  disabled={isReadOnly}
                   >
                     Save & Continue →
                   </button>
@@ -1559,7 +2007,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     <span>*</span>
                   </label>
 
-                  <textarea
+                  <textarea disabled={isReadOnly}
                     value={recentSuccesses}
                     onChange={event =>
                       updateReportField(
@@ -1578,6 +2026,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     type="button"
                     className="secondary-action-button"
                     onClick={handleSaveDraft}
+                    disabled={isReadOnly}
                   >
                     Save Draft
                   </button>
@@ -1588,6 +2037,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     onClick={
                       handleSaveAndContinue
                     }
+                  disabled={isReadOnly}
                   >
                     Save & Continue →
                   </button>
@@ -1605,7 +2055,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     Challenges
                   </label>
 
-                  <textarea
+                  <textarea disabled={isReadOnly}
                     value={challenges}
                     onChange={event =>
                       updateReportField(
@@ -1623,6 +2073,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     type="button"
                     className="secondary-action-button"
                     onClick={handleSaveDraft}
+                    disabled={isReadOnly}
                   >
                     Save Draft
                   </button>
@@ -1633,6 +2084,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     onClick={
                       handleSaveAndContinue
                     }
+                  disabled={isReadOnly}
                   >
                     Save & Continue →
                   </button>
@@ -1652,7 +2104,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     Resources Needed
                   </label>
 
-                  <textarea
+                  <textarea disabled={isReadOnly}
                     value={resourcesNeeded}
                     onChange={event =>
                       updateReportField(
@@ -1670,6 +2122,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     type="button"
                     className="secondary-action-button"
                     onClick={handleSaveDraft}
+                    disabled={isReadOnly}
                   >
                     Save Draft
                   </button>
@@ -1680,6 +2133,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     onClick={
                       handleSaveAndContinue
                     }
+                  disabled={isReadOnly}
                   >
                     Save & Continue →
                   </button>
@@ -1705,6 +2159,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                   onClick={
                     addActionItem
                   }
+                  disabled={isReadOnly}
                 >
                   <FaPlus />
                   Add Action Item
@@ -1731,7 +2186,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                       className="structured-entry-row"
                       key={index}
                     >
-                      <input
+                      <input disabled={isReadOnly}
                         type="text"
                         value={
                           item.actionItem
@@ -1748,7 +2203,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                         placeholder="Enter action item"
                       />
 
-                      <input
+                      <input disabled={isReadOnly}
                         type="text"
                         value={item.owner}
                         onChange={
@@ -1763,7 +2218,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                         placeholder="Owner"
                       />
 
-                      <input
+                      <input disabled={isReadOnly}
                         type="date"
                         value={
                           item.dueDate
@@ -1779,7 +2234,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                         }
                       />
 
-                      <input
+                      <input disabled={isReadOnly}
                         type="text"
                         value={item.status}
                         onChange={
@@ -1794,7 +2249,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                         placeholder="Status"
                       />
 
-                      <input
+                      <input disabled={isReadOnly}
                         type="text"
                         value={item.notes}
                         onChange={
@@ -1831,6 +2286,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                   type="button"
                   className="secondary-action-button"
                   onClick={handleSaveDraft}
+                  disabled={isReadOnly}
                 >
                   Save Draft
                 </button>
@@ -1841,6 +2297,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                   onClick={
                     handleSaveAndContinue
                   }
+                  disabled={isReadOnly}
                 >
                   Save & Continue →
                 </button>
@@ -1867,6 +2324,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                   onClick={
                     addDateToRemember
                   }
+                  disabled={isReadOnly}
                 >
                   <FaPlus />
                   Add Date
@@ -1889,7 +2347,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                       className="structured-entry-row"
                       key={index}
                     >
-                      <input
+                      <input disabled={isReadOnly}
                         type="date"
                         value={item.date}
                         onChange={
@@ -1903,7 +2361,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                         }
                       />
 
-                      <input
+                      <input disabled={isReadOnly}
                         type="text"
                         value={item.item}
                         onChange={
@@ -1918,7 +2376,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                         placeholder="Enter item or deadline"
                       />
 
-                      <input
+                      <input disabled={isReadOnly}
                         type="text"
                         value={item.owner}
                         onChange={
@@ -1955,6 +2413,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                   type="button"
                   className="secondary-action-button"
                   onClick={handleSaveDraft}
+                  disabled={isReadOnly}
                 >
                   Save Draft
                 </button>
@@ -1965,6 +2424,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                   onClick={
                     handleSaveAndContinue
                   }
+                  disabled={isReadOnly}
                 >
                   Save & Continue →
                 </button>
@@ -1988,6 +2448,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                   type="button"
                   className="add-row-button"
                   onClick={addBudgetItem}
+                  disabled={isReadOnly}
                 >
                   <FaPlus />
                   Add Budget Item
@@ -2013,7 +2474,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                       className="structured-entry-row"
                       key={index}
                     >
-                      <input
+                      <input disabled={isReadOnly}
                         type="text"
                         value={
                           item.category
@@ -2030,7 +2491,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                         placeholder="Enter category"
                       />
 
-                      <input
+                      <input disabled={isReadOnly}
                         type="number"
                         min="0"
                         step="0.01"
@@ -2049,7 +2510,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                         placeholder="0.00"
                       />
 
-                      <input
+                      <input disabled={isReadOnly}
                         type="number"
                         min="0"
                         step="0.01"
@@ -2068,7 +2529,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                         placeholder="0.00"
                       />
 
-                      <input
+                      <input disabled={isReadOnly}
                         type="text"
                         value={item.notes}
                         onChange={
@@ -2126,6 +2587,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                   type="button"
                   className="secondary-action-button"
                   onClick={handleSaveDraft}
+                  disabled={isReadOnly}
                 >
                   Save Draft
                 </button>
@@ -2136,6 +2598,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                   onClick={
                     handleSaveAndContinue
                   }
+                  disabled={isReadOnly}
                 >
                   Save & Review →
                 </button>
@@ -2147,26 +2610,20 @@ function CommitteeReportEntry({ onBack, onHome }) {
               <div className="report-preview-paper">
                 <div className="report-preview-header">
                   <div>
-                    <p className="report-preview-brand">
-                      MACReporting
-                    </p>
-
-                    <h1>
-                      Committee Report
-                    </h1>
-
+                    <p className="report-preview-brand">MACReporting</p>
+                    <h1>Committee Report</h1>
                     <p className="report-preview-subtitle">
-                      Social Action Committee
+                      {selectedCommitteeName() || "Committee not selected"}
                       {" • "}
-                      August 2026
+                      {reportDetails.reportingMonth && reportDetails.reportingYear
+                        ? `${reportDetails.reportingMonth} ${reportDetails.reportingYear}`
+                        : "Reporting period not selected"}
                     </p>
                   </div>
 
                   <div className="report-preview-status">
                     <span>Status</span>
-                    <strong>
-                      DRAFT
-                    </strong>
+                    <strong>{reportStatus.replaceAll("_", " ").toUpperCase()}</strong>
                   </div>
                 </div>
 
@@ -2174,10 +2631,50 @@ function CommitteeReportEntry({ onBack, onHome }) {
 
                 <section className="preview-section">
                   <div className="preview-section-heading">
-                    <h2>
-                      Program Overview
-                    </h2>
+                        <h2>Report Details</h2>
+                        <button
+                          type="button"
+                          className="preview-edit-button"
+                          onClick={() => editSection("Report Details")}
+                        >
+                          Edit
+                        </button>
+                      </div>
 
+                      <div className="preview-detail-grid">
+                        <div>
+                          <span className="preview-label">Reporting Month</span>
+                          <span className="preview-value">
+                            {displayValue(reportDetails.reportingMonth)}
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="preview-label">Reporting Year</span>
+                          <span className="preview-value">
+                            {displayValue(reportDetails.reportingYear)}
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="preview-label">Submitted By</span>
+                          <span className="preview-value">
+                            {selectedSubmitterName() || "—"}
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="preview-label">Committee</span>
+                          <span className="preview-value">
+                            {selectedCommitteeName() || "—"}
+                          </span>
+                        </div>
+                      </div>
+                    </section>
+
+                <section className="preview-section">
+                  <div className="preview-section-heading">
+                    <h2>Program Overview</h2>
                     <button
                       type="button"
                       className="preview-edit-button"
@@ -2193,10 +2690,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
 
                   <div className="preview-detail-grid">
                     <div>
-                      <span className="preview-label">
-                        Event / Program Name
-                      </span>
-
+                      <span className="preview-label">Event / Program Name</span>
                       <span className="preview-value">
                         {displayValue(
                           programOverview.eventName
@@ -2781,7 +3275,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     </span>
 
                     <span className="preview-value">
-                      Social Action Committee
+                      {selectedCommitteeName() || "—"}
                     </span>
                   </div>
 
@@ -2791,7 +3285,9 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     </span>
 
                     <span className="preview-value">
-                      August 2026
+                      {reportDetails.reportingMonth && reportDetails.reportingYear
+                        ? `${reportDetails.reportingMonth} ${reportDetails.reportingYear}`
+                        : "—"}
                     </span>
                   </div>
                 </div>
@@ -2810,13 +3306,175 @@ function CommitteeReportEntry({ onBack, onHome }) {
                   ← Back
                 </button>
 
-                <button
-                  type="button"
-                  className="primary-action-button"
-                  disabled
-                >
-                  Submit Report
-                </button>
+                {isReviewerView ? (
+                  <button
+                    type="button"
+                    className="primary-action-button"
+                    onClick={() => setCurrentSection("Reviewer Action")}
+                  >
+                    Continue to Reviewer Action →
+                  </button>
+                ) : isLockView ? (
+                  <button
+                    type="button"
+                    className="primary-action-button"
+                    onClick={() => setCurrentSection("Finalization Action")}
+                  >
+                    Continue to Finalization →
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="primary-action-button"
+                    onClick={handleSubmitReport}
+                    disabled={!reportId || isReadOnly}
+                  >
+                    {reportStatus === "locked"
+                      ? "Report Locked"
+                      : isReadOnly
+                        ? "Report Submitted"
+                        : reportStatus === "returned_for_changes"
+                          ? "Resubmit Report"
+                          : "Submit Report"}
+                  </button>
+                )}
+              </div>
+            </section>
+          ) : currentSection === "Reviewer Action" ? (
+            <section>
+              <div className="reviewer-action-header">
+                <h2>Reviewer Action</h2>
+                <p>Review this submitted report and choose an action below.</p>
+              </div>
+
+              <div className="entry-form">
+                {reviewError && (
+                  <div className="form-validation-message">{reviewError}</div>
+                )}
+
+                {reviewMessage && (
+                  <div className="form-save-message">{reviewMessage}</div>
+                )}
+
+                <div className="reviewer-summary-card">
+                  <div className="reviewer-summary-item">
+                    <span className="reviewer-summary-label">Reviewer</span>
+                    <span className="reviewer-summary-value">{reviewerName}</span>
+                  </div>
+
+                  <div className="reviewer-summary-item">
+                    <span className="reviewer-summary-label">Committee</span>
+                    <span className="reviewer-summary-value">
+                      {selectedCommitteeName() || "—"}
+                    </span>
+                  </div>
+
+                  <div className="reviewer-summary-item">
+                    <span className="reviewer-summary-label">Status</span>
+                    <span className={`status-badge ${reportStatus}`}>
+                      {reportStatus.replaceAll("_", " ").toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="entry-form-group full-width reviewer-comments-group">
+                  <label>Reviewer Comments</label>
+                  <p className="field-helper-text">
+                    Comments are required when returning a report for changes and optional when approving.
+                  </p>
+                  <textarea
+                    value={reviewComments}
+                    onChange={event => {
+                      setReviewComments(event.target.value);
+                      if (reviewError) setReviewError("");
+                    }}
+                    rows="6"
+                    placeholder="Enter comments for the committee chair..."
+                  />
+                </div>
+
+                <div className="reviewer-action-buttons">
+                  <button
+                    type="button"
+                    className="secondary-action-button"
+                    onClick={handleReturnForChanges}
+                  >
+                    ← Return for Changes
+                  </button>
+
+                  <button
+                    type="button"
+                    className="primary-action-button"
+                    onClick={handleApproveReport}
+                  >
+                    Approve Report ✓
+                  </button>
+                </div>
+              </div>
+            </section>
+          ) : currentSection === "Finalization Action" ? (
+            <section>
+              <div className="reviewer-action-header">
+                <h2>Finalization Action</h2>
+                <p>
+                  Lock this approved report to complete the reporting workflow.
+                  Once locked, the report is read-only and ready for final PDF generation.
+                </p>
+              </div>
+
+              <div className="entry-form">
+                {lockError && <div className="form-validation-message">{lockError}</div>}
+                {lockMessage && <div className="form-save-message">{lockMessage}</div>}
+
+                <div className="reviewer-summary-card">
+                  <div className="reviewer-summary-item">
+                    <span className="reviewer-summary-label">Finalized By</span>
+                    <span className="reviewer-summary-value">{finalizerName}</span>
+                  </div>
+                  <div className="reviewer-summary-item">
+                    <span className="reviewer-summary-label">Committee</span>
+                    <span className="reviewer-summary-value">{selectedCommitteeName() || "—"}</span>
+                  </div>
+                  <div className="reviewer-summary-item">
+                    <span className="reviewer-summary-label">Status</span>
+                    <span className={`status-badge ${reportStatus}`}>
+                      {reportStatus.replaceAll("_", " ").toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="entry-form-group full-width reviewer-comments-group">
+                  <label>Finalization Comments</label>
+                  <p className="field-helper-text">
+                    Comments are optional and will be saved with the report's status history.
+                  </p>
+                  <textarea
+                    value={lockComments}
+                    onChange={event => {
+                      setLockComments(event.target.value);
+                      if (lockError) setLockError("");
+                    }}
+                    rows="6"
+                    placeholder="Enter optional finalization comments..."
+                  />
+                </div>
+
+                <div className="reviewer-action-buttons">
+                  <button
+                    type="button"
+                    className="secondary-action-button"
+                    onClick={() => setCurrentSection("Review")}
+                  >
+                    ← Back to Review
+                  </button>
+                  <button
+                    type="button"
+                    className="primary-action-button"
+                    onClick={handleLockReport}
+                  >
+                    Lock Report
+                  </button>
+                </div>
               </div>
             </section>
           ) : (
