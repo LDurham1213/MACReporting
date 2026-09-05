@@ -61,7 +61,7 @@ def create_report_template():
             INSERT INTO report_template_versions (
                 report_template_id,
                 version,
-                created_by,
+                create_by,
                 active
             )
             VALUES (%s, 1, %s, TRUE)

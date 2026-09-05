@@ -5,15 +5,15 @@ BEGIN;
 -- Used only to identify who created initial versioned seed data.
 -- =========================================================
 
-INSERT INTO users (first_name, last_name, email, active)
+INSERT INTO users (f_name, l_name, email, active)
 VALUES ('System', 'Seed', 'seed@macreporting.local', FALSE);
 
 -- =========================================================
 -- INITIAL COMMITTEE
 -- =========================================================
 
-INSERT INTO committees (committee_name)
-VALUES ('Social Action Committee');
+INSERT INTO committees (committee_name, comm_abbr)
+VALUES ('Social Action', 'SA');
 
 -- =========================================================
 -- REPORT TEMPLATES
@@ -31,7 +31,7 @@ VALUES
 INSERT INTO report_template_versions (
   report_template_id,
   version,
-  created_by
+  create_by
 )
 SELECT report_template_id, 1,
        (SELECT user_id FROM users WHERE email = 'seed@macreporting.local')
@@ -91,7 +91,7 @@ INSERT INTO question_versions (
   version,
   question_text,
   question_type,
-  created_by
+  create_by
 )
 SELECT
   q.question_id,
@@ -155,9 +155,9 @@ INSERT INTO report_questions (
   question_id,
   question_version,
   section_name,
-  display_order,
+  disp_ord,
   required,
-  created_by
+  create_by
 )
 SELECT
   rt.report_template_id,
@@ -201,9 +201,9 @@ INSERT INTO report_questions (
   question_id,
   question_version,
   section_name,
-  display_order,
+  disp_ord,
   required,
-  created_by
+  create_by
 )
 SELECT
   rt.report_template_id,

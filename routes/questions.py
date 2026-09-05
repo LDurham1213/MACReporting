@@ -75,7 +75,7 @@ def create_next_template_version(
         INSERT INTO report_template_versions (
             report_template_id,
             version,
-            created_by,
+            create_by,
             active
         )
         VALUES (%s, %s, %s, TRUE)
@@ -105,9 +105,9 @@ def create_next_template_version(
                 question_id,
                 question_version,
                 section_name,
-                display_order,
+                disp_ord,
                 required,
-                created_by,
+                create_by,
                 active
             )
             SELECT
@@ -127,7 +127,7 @@ def create_next_template_version(
                 CASE
                     WHEN question_id = %s
                     THEN %s
-                    ELSE display_order
+                    ELSE disp_ord
                 END,
                 CASE
                     WHEN question_id = %s
@@ -167,9 +167,9 @@ def create_next_template_version(
                 question_id,
                 question_version,
                 section_name,
-                display_order,
+                disp_ord,
                 required,
-                created_by,
+                create_by,
                 active
             )
             SELECT
@@ -178,7 +178,7 @@ def create_next_template_version(
                 question_id,
                 question_version,
                 section_name,
-                display_order,
+                disp_ord,
                 required,
                 %s,
                 active
@@ -206,9 +206,9 @@ def create_next_template_version(
             question_id,
             question_version,
             section_name,
-            display_order,
+            disp_ord,
             required,
-            created_by,
+            create_by,
             active
         )
         SELECT
@@ -217,7 +217,7 @@ def create_next_template_version(
             question_id,
             question_version,
             section_name,
-            display_order,
+            disp_ord,
             required,
             %s,
             active
@@ -254,7 +254,7 @@ def get_questions():
                 rq.report_template_id,
                 rq.section_name,
                 rq.required,
-                rq.display_order
+                rq.disp_ord AS display_order
             FROM questions q
 
             JOIN LATERAL (
@@ -273,7 +273,7 @@ def get_questions():
                     rq.report_template_id,
                     rq.section_name,
                     rq.required,
-                    rq.display_order
+                    rq.disp_ord
                 FROM report_questions rq
 
                 JOIN report_template_versions rtv
@@ -342,7 +342,7 @@ def create_question():
                 version,
                 question_text,
                 question_type,
-                created_by,
+                create_by,
                 active
             )
             VALUES (
@@ -376,9 +376,9 @@ def create_question():
                 question_id,
                 question_version,
                 section_name,
-                display_order,
+                disp_ord,
                 required,
-                created_by,
+                create_by,
                 active
             )
             VALUES (
@@ -482,7 +482,7 @@ def update_question(question_id):
                 version,
                 question_text,
                 question_type,
-                created_by,
+                create_by,
                 active
             )
             VALUES (
@@ -540,9 +540,9 @@ def update_question(question_id):
                     question_id,
                     question_version,
                     section_name,
-                    display_order,
+                    disp_ord,
                     required,
-                    created_by,
+                    create_by,
                     active
                 )
                 VALUES (
@@ -696,7 +696,7 @@ def get_template_questions(template_id):
                 rq.report_version,
                 rq.section_name,
                 rq.required,
-                rq.display_order
+                rq.disp_ord AS display_order
             FROM report_questions rq
 
             JOIN questions q
@@ -713,7 +713,7 @@ def get_template_questions(template_id):
               AND rq.report_version = %s
               AND rq.active = TRUE
 
-            ORDER BY rq.display_order
+            ORDER BY rq.disp_ord
             """,
             (
                 template_id,

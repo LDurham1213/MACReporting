@@ -13,12 +13,12 @@ def get_users():
             """
             SELECT
                 user_id,
-                first_name,
-                last_name,
+                f_name AS first_name,
+                l_name AS last_name,
                 email
             FROM users
             WHERE active = TRUE
-            ORDER BY last_name, first_name
+            ORDER BY l_name, f_name
             """
         ).fetchall()
 
