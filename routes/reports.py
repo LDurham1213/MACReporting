@@ -1,10 +1,25 @@
+from datetime import datetime, timezone
 from pathlib import Path
+
 from flask import Blueprint, jsonify, request, send_file
-from psycopg.errors import ForeignKeyViolation, CheckViolation
-from db import get_db_connection
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+
+from db import get_db_session
+from models import Committee, Report, ReportStatusHistory, User
 from pdf_services.pdf_service import generate_report_pdf
+
 reports_bp = Blueprint("reports", __name__)
+
 EDITABLE_STATUSES = ("draft", "returned_for_changes")
+
+def parse_date(value):
+    if not value:
+        return None
+    if isinstance(value, str):
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    return value
+
 DB_TO_API_KEYS = {
     "rept_temp_id": "report_template_id",
     "rept_temp_vsn": "report_template_version",
@@ -24,284 +39,183 @@ DB_TO_API_KEYS = {
     "due_dt": "due_date",
     "disp_ord": "display_order",
 }
+
+def model_row(instance):
+    if instance is None:
+        return None
+    return {column.name: getattr(instance, column.name) for column in instance.__table__.columns}
+
 def api_row(row):
     if row is None:
         return None
-    return {
-        DB_TO_API_KEYS.get(key, key): value
-        for key, value in row.items()
-    }
+    if hasattr(row, "__table__"):
+        row = model_row(row)
+    else:
+        row = dict(row)
+    return {DB_TO_API_KEYS.get(key, key): value for key, value in row.items()}
+
 def api_rows(rows):
     return [api_row(row) for row in rows]
-def get_edit_error(connection, report_id):
-    report = connection.execute(
-        "SELECT status, locked FROM reports WHERE report_id = %s",
-        (report_id,)
-    ).fetchone()
+
+def get_edit_error(session, report_id):
+    report = session.get(Report, report_id)
     if not report:
         return jsonify({"error": "Report not found"}), 404
-    if report["locked"] or report["status"] not in EDITABLE_STATUSES:
-        return jsonify({
-            "error": (
-                "Only Draft or Returned for Changes reports "
-                "can be updated"
-            )
-        }), 409
+    if report.locked or report.status not in EDITABLE_STATUSES:
+        return jsonify({"error": "Only Draft or Returned for Changes reports can be updated"}), 409
     return None
 
 # =========================================================
 # REPORTS
 # =========================================================
+
 @reports_bp.route("/reports", methods=["GET"])
 def get_reports():
-    report_template_id = request.args.get(
-        "report_template_id",
-type=int
-    )
-    with get_db_connection() as connection:
-        if report_template_id is None:
-            reports = connection.execute(
-                """
-                SELECT
-                    r.report_id,
-                    r.report_title,
-                    r.rept_temp_id AS report_template_id,
-                    r.rept_temp_vsn AS report_template_version,
-                    r.committee_id,
-                    c.committee_name,
-                    r.create_by_uid AS created_by_user_id,
-                    u.f_name AS first_name,
-                    u.l_name AS last_name,
-                    r.reporting_period,
-                    r.event_dt AS event_date,
-                    r.status,
-                    r.locked,
-                    r.create_dt AS created_at,
-                    r.upd_dt AS updated_at
-                FROM reports r
-                JOIN committees c
-                  ON c.committee_id = r.committee_id
-                JOIN users u
-                  ON u.user_id = r.create_by_uid
-                ORDER BY r.upd_dt DESC, r.report_id DESC
-                """
-            ).fetchall()
-        else:
-            reports = connection.execute(
-                """
-                SELECT
-                    r.report_id,
-                    r.report_title,
-                    r.rept_temp_id AS report_template_id,
-                    r.rept_temp_vsn AS report_template_version,
-                    r.committee_id,
-                    c.committee_name,
-                    r.create_by_uid AS created_by_user_id,
-                    u.f_name AS first_name,
-                    u.l_name AS last_name,
-                    r.reporting_period,
-                    r.event_dt AS event_date,
-                    r.status,
-                    r.locked,
-                    r.create_dt AS created_at,
-                    r.upd_dt AS updated_at
-                FROM reports r
-                JOIN committees c
-                  ON c.committee_id = r.committee_id
-                JOIN users u
-                  ON u.user_id = r.create_by_uid
-                WHERE r.rept_temp_id = %s
-                ORDER BY r.upd_dt DESC, r.report_id DESC
-                """,
-                (report_template_id,)
-            ).fetchall()
-    return jsonify(reports), 200
+    report_template_id = request.args.get("report_template_id", type=int)
+    session = get_db_session()
+    try:
+        statement = (
+            select(
+                Report.report_id,
+                Report.report_title,
+                Report.rept_temp_id.label("report_template_id"),
+                Report.rept_temp_vsn.label("report_template_version"),
+                Report.committee_id,
+                Committee.committee_name,
+                Report.create_by_uid.label("created_by_user_id"),
+                User.f_name.label("first_name"),
+                User.l_name.label("last_name"),
+                Report.reporting_period,
+                Report.event_dt.label("event_date"),
+                Report.status,
+                Report.locked,
+                Report.create_dt.label("created_at"),
+                Report.upd_dt.label("updated_at")
+            )
+            .join(Committee, Committee.committee_id == Report.committee_id)
+            .join(User, User.user_id == Report.create_by_uid)
+        )
+
+        if report_template_id is not None:
+            statement = statement.where(Report.rept_temp_id == report_template_id)
+
+        reports = session.execute(
+            statement.order_by(Report.upd_dt.desc(), Report.report_id.desc())
+        ).mappings().all()
+
+        return jsonify([dict(report) for report in reports]), 200
+    finally:
+        session.close()
+
 @reports_bp.route("/reports", methods=["POST"])
 def create_report():
     data = request.get_json(silent=True) or {}
+    session = get_db_session()
     try:
-        with get_db_connection() as connection:
-            report = connection.execute(
-                """
-                INSERT INTO reports (
-                    rept_temp_id,
-                    rept_temp_vsn,
-                    committee_id,
-                    create_by_uid,
-                    report_title,
-                    reporting_period,
-                    event_dt
-                )
-                VALUES (
-                    %s,
-                    %s,
-                    %s,
-                    %s,
-                    %s,
-                    %s,
-                    %s
-                )
-                RETURNING *
-                """,
-                (
-                    data["report_template_id"],
-                    data["report_template_version"],
-                    data["committee_id"],
-                    data["created_by_user_id"],
-                    data["report_title"],
-                    data.get("reporting_period"),
-                    data.get("event_date")
-                )
-            ).fetchone()
+        report = Report(
+            rept_temp_id=data["report_template_id"],
+            rept_temp_vsn=data["report_template_version"],
+            committee_id=data["committee_id"],
+            create_by_uid=data["created_by_user_id"],
+            report_title=data["report_title"],
+            reporting_period=parse_date(data.get("reporting_period")),
+            event_dt=parse_date(data.get("event_date"))
+        )
+        session.add(report)
+        session.commit()
+        session.refresh(report)
         return jsonify(api_row(report)), 201
-    except ForeignKeyViolation:
-        return jsonify({
-            "error": (
-                "Invalid report reference. "
-                "Check template, committee, or user IDs."
-            )
-        }), 400
+    except IntegrityError:
+        session.rollback()
+        return jsonify({"error": "Invalid report reference. Check template, committee, or user IDs."}), 400
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
 @reports_bp.route("/reports/<int:report_id>", methods=["GET"])
 def get_report(report_id):
-    with get_db_connection() as connection:
-        report = connection.execute(
-            """
-            SELECT *
-            FROM reports
-            WHERE report_id = %s
-            """,
-            (report_id,)
-        ).fetchone()
-    if not report:
-        return jsonify({
-            "error": "Report not found"
-        }), 404
-    return jsonify(api_row(report))
+    session = get_db_session()
+    try:
+        report = session.get(Report, report_id)
+        if not report:
+            return jsonify({"error": "Report not found"}), 404
+        return jsonify(api_row(report))
+    finally:
+        session.close()
+
 @reports_bp.route("/reports/<int:report_id>", methods=["PUT"])
 def update_report(report_id):
     data = request.get_json(silent=True) or {}
-    with get_db_connection() as connection:
-        edit_error = get_edit_error(connection, report_id)
+    session = get_db_session()
+    try:
+        edit_error = get_edit_error(session, report_id)
         if edit_error:
             return edit_error
-        existing = connection.execute(
-            "SELECT * FROM reports WHERE report_id = %s",
-            (report_id,)
-        ).fetchone()
-        if not existing:
+
+        report = session.get(Report, report_id)
+        if not report:
             return jsonify({"error": "Report not found"}), 404
-        report = connection.execute(
-            """
-            UPDATE reports
-            SET report_title = %s,
-                reporting_period = %s,
-                event_dt = %s,
-                committee_id = %s,
-                create_by_uid = %s,
-                upd_dt = CURRENT_TIMESTAMP
-            WHERE report_id = %s
-            RETURNING *
-            """,
-            (
-                data.get(
-                    "report_title",
-                    existing["report_title"]
-                ),
-                data.get(
-                    "reporting_period",
-                    existing["reporting_period"]
-                ),
-                data.get(
-                    "event_date",
-                    existing["event_dt"]
-                ),
-                data.get(
-                    "committee_id",
-                    existing["committee_id"]
-                ),
-                data.get(
-                    "created_by_user_id",
-                    existing["create_by_uid"]
-                ),
-report_id
-            )
-        ).fetchone()
-    return jsonify(api_row(report))
+
+        report.report_title = data.get("report_title", report.report_title)
+        report.reporting_period = parse_date(data["reporting_period"]) if "reporting_period" in data else report.reporting_period
+        report.event_dt = parse_date(data["event_date"]) if "event_date" in data else report.event_dt
+        report.committee_id = data.get("committee_id", report.committee_id)
+        report.create_by_uid = data.get("created_by_user_id", report.create_by_uid)
+        report.upd_dt = datetime.now(timezone.utc)
+
+        session.commit()
+        session.refresh(report)
+        return jsonify(api_row(report))
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 # =========================================================
 # REPORT SUBMISSION
 # =========================================================
-@reports_bp.route(
-    "/reports/<int:report_id>/submit",
-methods=["POST"]
-)
+
+@reports_bp.route("/reports/<int:report_id>/submit", methods=["POST"])
 def submit_report(report_id):
     data = request.get_json(silent=True) or {}
-    with get_db_connection() as connection:
-        report = connection.execute(
-            """
-            SELECT *
-            FROM reports
-            WHERE report_id = %s
-            FOR UPDATE
-            """,
-            (report_id,)
-        ).fetchone()
+    session = get_db_session()
+    try:
+        report = session.execute(
+            select(Report).where(Report.report_id == report_id).with_for_update()
+        ).scalar_one_or_none()
+
         if not report:
-            return jsonify({
-                "error": "Report not found"
-            }), 404
-        if report["locked"]:
-            return jsonify({
-                "error": "Locked reports cannot be submitted"
-            }), 409
-        if report["status"] not in EDITABLE_STATUSES:
-            return jsonify({
-                "error": (
-                    "Only Draft or Returned for Changes "
-                    "reports can be submitted"
-                )
-            }), 409
-        changed_by_user_id = data.get(
-            "changed_by_user_id",
-            report["create_by_uid"]
-        )
-        previous_status = report["status"]
-        updated_report = connection.execute(
-            """
-            UPDATE reports
-            SET status = 'submitted',
-                upd_dt = CURRENT_TIMESTAMP
-            WHERE report_id = %s
-            RETURNING *
-            """,
-            (report_id,)
-        ).fetchone()
-        connection.execute(
-            """
-            INSERT INTO report_status_history (
-                report_id,
-                from_status,
-                to_status,
-                chgd_by_uid,
-                comments
-            )
-            VALUES (
-                %s,
-                %s,
-                'submitted',
-                %s,
-                %s
-            )
-            """,
-            (
-report_id,
-                previous_status,
-                changed_by_user_id,
-                data.get("comments")
-            )
-        )
-    return jsonify(api_row(updated_report)), 200
+            return jsonify({"error": "Report not found"}), 404
+        if report.locked:
+            return jsonify({"error": "Locked reports cannot be submitted"}), 409
+        if report.status not in EDITABLE_STATUSES:
+            return jsonify({"error": "Only Draft or Returned for Changes reports can be submitted"}), 409
+
+        changed_by_user_id = data.get("changed_by_user_id", report.create_by_uid)
+        previous_status = report.status
+
+        report.status = "submitted"
+        report.upd_dt = datetime.now(timezone.utc)
+
+        session.add(ReportStatusHistory(
+            report_id=report_id,
+            from_status=previous_status,
+            to_status="submitted",
+            chgd_by_uid=changed_by_user_id,
+            comments=data.get("comments")
+        ))
+
+        session.commit()
+        session.refresh(report)
+        return jsonify(api_row(report)), 200
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 # =========================================================
 # APPROVAL QUEUE
