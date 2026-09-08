@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import macLogo from "../assets/MAC_LOGO.png";
 import {
   FaBars,
   FaCheckCircle,
@@ -43,7 +44,9 @@ const questionMap = {
   goals: { questionId: 11, version: 1 },
   recentSuccesses: { questionId: 12, version: 1 },
   challenges: { questionId: 13, version: 1 },
-  resourcesNeeded: { questionId: 14, version: 1 }
+  resourcesNeeded: { questionId: 14, version: 1 },
+  financialRequest: { questionId: 39, version: 1 },
+  financialRequestDescription: { questionId: 41, version: 1 }
 };
 
 const months = [
@@ -90,6 +93,8 @@ const initialReportData = {
   recentSuccesses: "",
   challenges: "",
   resourcesNeeded: "",
+  financialRequest: "",
+  financialRequestDescription: "",
   actionItems: [
     {
       id: null,
@@ -119,7 +124,7 @@ const initialReportData = {
   ]
 };
 
-function CommitteeReportEntry({ onBack, onHome }) {
+function CommitteeReportEntry({ onBack, onHome, currentUserId }) {
   const [reportId, setReportId] = useState(null);
   const [reportStatus, setReportStatus] = useState("draft");
   const [statusHistory, setStatusHistory] = useState([]);
@@ -144,6 +149,8 @@ function CommitteeReportEntry({ onBack, onHome }) {
   const [lockComments, setLockComments] = useState("");
   const [lockMessage, setLockMessage] = useState("");
   const [lockError, setLockError] = useState("");
+
+  const [canGeneratePdf, setCanGeneratePdf] = useState(false);
   const isReadOnly = !["draft", "returned_for_changes"].includes(reportStatus);
   const isReviewerView = reportStatus === "submitted" && Boolean(reviewerUserId);
   const isLockView = reportStatus === "approved" && Boolean(lockUserId);
@@ -166,17 +173,19 @@ function CommitteeReportEntry({ onBack, onHome }) {
     : "Authorized Finalizer";
 
   const {
-    reportDetails,
-    programOverview,
-    programSummary,
-    goals,
-    recentSuccesses,
-    challenges,
-    resourcesNeeded,
-    actionItems,
-    datesToRemember,
-    budgetItems
-  } = reportData;
+  reportDetails,
+  programOverview,
+  programSummary,
+  goals,
+  recentSuccesses,
+  challenges,
+  resourcesNeeded,
+  financialRequest,
+  financialRequestDescription,
+  actionItems,
+  datesToRemember,
+  budgetItems
+} = reportData;
 
   useEffect(() => {
     async function initializeReport() {
@@ -206,6 +215,17 @@ function CommitteeReportEntry({ onBack, onHome }) {
     initializeReport();
   }, []);
 
+  useEffect(() => {
+    if (!currentUserId) {
+      setCanGeneratePdf(false);
+      return;
+    }
+
+    apiRequest(`/reports/awaiting-lock?user_id=${currentUserId}`)
+      .then(data => setCanGeneratePdf(Boolean(data.can_finalize)))
+      .catch(() => setCanGeneratePdf(false));
+  }, [currentUserId]);
+
   async function apiRequest(url, options = {}) {
     const response = await fetch(`${API_BASE}${url}`, {
       headers: {
@@ -222,6 +242,67 @@ function CommitteeReportEntry({ onBack, onHome }) {
     }
 
     return data;
+  }
+
+  async function handleGeneratePdf() {
+    if (!reportId) {
+      setLockError("Please save the report before generating a PDF.");
+      return;
+    }
+
+    const pdfUserId = currentUserId;
+
+    if (!pdfUserId) {
+      setLockError("An authorized user is required to generate the PDF.");
+      return;
+    }
+
+    try {
+      setLockError("");
+      setLockMessage("Generating PDF...");
+
+      const response = await fetch(`${API_BASE}/reports/${reportId}/pdf`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          changed_by_user_id: Number(pdfUserId)
+        })
+      });
+
+      if (!response.ok) {
+        let errorMessage = "Unable to generate PDF.";
+
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          // Response was not JSON.
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const pdfBlob = await response.blob();
+
+      const downloadUrl = window.URL.createObjectURL(pdfBlob);
+      const link = document.createElement("a");
+
+      link.href = downloadUrl;
+      link.download = getPdfFilename();
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.URL.revokeObjectURL(downloadUrl);
+
+      setLockMessage("PDF generated successfully.");
+    } catch (error) {
+      setLockMessage("");
+      setLockError(error.message);
+    }
   }
 
   function updateReportDetails(field, value) {
@@ -416,6 +497,22 @@ function CommitteeReportEntry({ onBack, onHome }) {
 
     const monthNumber = months.indexOf(reportDetails.reportingMonth) + 1;
     return `${reportDetails.reportingYear}-${String(monthNumber).padStart(2, "0")}-01`;
+  }
+
+  function selectedCommitteeAbbreviation() {
+    const committee = committees.find(item => String(item.committee_id) === String(reportDetails.committeeId));
+    return committee?.comm_abbr || "";
+  }
+
+  function safeFilenamePart(value) {
+    return String(value || "").trim().replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  }
+
+  function getPdfFilename() {
+    const abbreviation = safeFilenamePart(selectedCommitteeAbbreviation()).toUpperCase() || "Committee";
+    const monthNumber = String(months.indexOf(reportDetails.reportingMonth) + 1).padStart(2, "0");
+    const year = reportDetails.reportingYear || String(currentYear);
+    return `${abbreviation}_Committee_Report_${monthNumber}${year}.pdf`;
   }
 
   function selectedCommitteeName() {
@@ -799,11 +896,23 @@ function CommitteeReportEntry({ onBack, onHome }) {
     }
 
     if (currentSection === "Resources Needed") {
-      await saveAnswer(
-        draftId,
-        "resourcesNeeded",
-        resourcesNeeded
-      );
+      await Promise.all([
+        saveAnswer(
+          draftId,
+          "resourcesNeeded",
+          resourcesNeeded
+        ),
+        saveAnswer(
+          draftId,
+          "financialRequest",
+          financialRequest
+        ),
+        saveAnswer(
+          draftId,
+          "financialRequestDescription",
+          financialRequestDescription
+        )
+      ]);
     }
 
     if (currentSection === "Action Items") {
@@ -921,7 +1030,13 @@ function CommitteeReportEntry({ onBack, onHome }) {
           answerValues[13] || "",
 
         resourcesNeeded:
-          answerValues[14] || ""
+          answerValues[14] || "",
+
+        financialRequest:
+          answerValues[39] || "",
+
+        financialRequestDescription:
+          answerValues[41] || ""
       };
 
       const [
@@ -1087,6 +1202,17 @@ function CommitteeReportEntry({ onBack, onHome }) {
     ) {
       setValidationMessage(
         "Please complete the required field before continuing."
+      );
+      return;
+    }
+
+    if (
+      currentSection === "Resources Needed" &&
+      Number(financialRequest) > 0 &&
+      !financialRequestDescription.trim()
+    ) {
+      setValidationMessage(
+        "Please provide a description for the financial request."
       );
       return;
     }
@@ -1375,9 +1501,7 @@ function CommitteeReportEntry({ onBack, onHome }) {
             )}
           </div>
 
-          <div className="entry-logo-placeholder">
-            Organization Logo
-          </div>
+          <img src={macLogo} alt="MAC Logo" className="entry-logo" />
 
           <div className="entry-report-title">
             <h1>Committee Report</h1>
@@ -2099,6 +2223,12 @@ function CommitteeReportEntry({ onBack, onHome }) {
               </h2>
 
               <form className="entry-form">
+                {validationMessage && (
+                  <div className="form-validation-message">
+                    {validationMessage}
+                  </div>
+                )}
+
                 <div className="entry-form-group full-width">
                   <label>
                     Resources Needed
@@ -2114,6 +2244,48 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     }
                     placeholder="Enter resources, support, or assistance needed"
                     rows="8"
+                  />
+                </div>
+
+                <div className="entry-form-group full-width">
+                  <label>
+                    Financial Request
+                  </label>
+
+                  <input
+                    disabled={isReadOnly}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={financialRequest}
+                    onChange={event =>
+                      updateReportField(
+                        "financialRequest",
+                        event.target.value
+                      )
+                    }
+                    placeholder="0.00"
+                  />
+                </div>
+
+                <div className="entry-form-group full-width">
+                  <label>
+                    Financial Request Description
+                    {Number(financialRequest) > 0 && <span> *</span>}
+                  </label>
+
+                  <textarea
+                    disabled={isReadOnly}
+                    value={financialRequestDescription}
+                    onChange={event =>
+                      updateReportField(
+                        "financialRequestDescription",
+                        event.target.value
+                      )
+                    }
+                    placeholder="Describe what the requested funds will be used for"
+                    rows="4"
+                    required={Number(financialRequest) > 0}
                   />
                 </div>
 
@@ -2932,6 +3104,28 @@ function CommitteeReportEntry({ onBack, onHome }) {
                       )}
                     </p>
                   </div>
+
+                  <div className="preview-narrative-block">
+                    <h3>
+                      Financial Request
+                    </h3>
+
+                    <p>
+                      {financialRequest !== ""
+                        ? displayCurrency(financialRequest)
+                        : "—"}
+                    </p>
+                  </div>
+
+                  <div className="preview-narrative-block">
+                    <h3>
+                      Financial Request Description
+                    </h3>
+
+                    <p>
+                      {displayValue(financialRequestDescription)}
+                    </p>
+                  </div>
                 </section>
 
                 <section className="preview-section">
@@ -3064,72 +3258,54 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     </button>
                   </div>
 
-                  {datesToRemember.some(
-                    item =>
-                      item.date ||
-                      item.item ||
-                      item.owner
-                  ) ? (
-                    <div className="preview-table-wrap">
-                      <table className="preview-table">
-                        <thead>
-                          <tr>
-                            <th>Date</th>
-                            <th>
-                              Item / Deadline
-                            </th>
-                            <th>
-                              Owner
-                            </th>
-                          </tr>
-                        </thead>
+                  <div className="preview-table-wrap">
+                    <table className="preview-table">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>
+                            Item / Deadline
+                          </th>
+                          <th>
+                            Owner
+                          </th>
+                        </tr>
+                      </thead>
 
-                        <tbody>
-                          {datesToRemember
-                            .filter(
-                              item =>
-                                item.date ||
-                                item.item ||
-                                item.owner
-                            )
-                            .map(
-                              (
-                                item,
+                      <tbody>
+                        {datesToRemember.map(
+                          (
+                            item,
+                            index
+                          ) => (
+                            <tr
+                              key={
                                 index
-                              ) => (
-                                <tr
-                                  key={
-                                    index
-                                  }
-                                >
-                                  <td>
-                                    {displayValue(
-                                      item.date
-                                    )}
-                                  </td>
+                              }
+                            >
+                              <td>
+                                {displayValue(
+                                  item.date
+                                )}
+                              </td>
 
-                                  <td>
-                                    {displayValue(
-                                      item.item
-                                    )}
-                                  </td>
+                              <td>
+                                {displayValue(
+                                  item.item
+                                )}
+                              </td>
 
-                                  <td>
-                                    {displayValue(
-                                      item.owner
-                                    )}
-                                  </td>
-                                </tr>
-                              )
-                            )}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <p className="preview-empty">
-                      No dates entered.
-                    </p>
-                  )}
+                              <td>
+                                {displayValue(
+                                  item.owner
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </section>
 
                 <section className="preview-section">
@@ -3149,113 +3325,101 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     </button>
                   </div>
 
-                  {budgetItems.some(
-                    item =>
-                      item.category ||
-                      item.estimatedCost ||
-                      item.actualCost ||
-                      item.notes
-                  ) ? (
-                    <div className="preview-table-wrap">
-                      <table className="preview-table">
-                        <thead>
-                          <tr>
-                            <th>
-                              Category
-                            </th>
-                            <th>
-                              Estimated Cost
-                            </th>
-                            <th>
-                              Actual Cost
-                            </th>
-                            <th>
-                              Notes
-                            </th>
-                          </tr>
-                        </thead>
+                  <div className="preview-table-wrap">
+                    <table className="preview-table">
+                      <thead>
+                        <tr>
+                          <th>
+                            Category
+                          </th>
+                          <th>
+                            Estimated Cost
+                          </th>
+                          <th>
+                            Actual Cost
+                          </th>
+                          <th>
+                            Notes
+                          </th>
+                        </tr>
+                      </thead>
 
-                        <tbody>
-                          {budgetItems
-                            .filter(
-                              item =>
-                                item.category ||
-                                item.estimatedCost ||
-                                item.actualCost ||
-                                item.notes
-                            )
-                            .map(
-                              (
-                                item,
+                      <tbody>
+                        {budgetItems.map(
+                          (
+                            item,
+                            index
+                          ) => (
+                            <tr
+                              key={
                                 index
-                              ) => (
-                                <tr
-                                  key={
-                                    index
-                                  }
-                                >
-                                  <td>
-                                    {displayValue(
-                                      item.category
-                                    )}
-                                  </td>
+                              }
+                            >
+                              <td>
+                                {displayValue(
+                                  item.category
+                                )}
+                              </td>
 
-                                  <td>
-                                    {displayCurrency(
+                              <td>
+                                {item.estimatedCost === "" ||
+                                item.estimatedCost === null ||
+                                item.estimatedCost === undefined
+                                  ? "—"
+                                  : displayCurrency(
                                       item.estimatedCost
                                     )}
-                                  </td>
+                              </td>
 
-                                  <td>
-                                    {displayCurrency(
+                              <td>
+                                {item.actualCost === "" ||
+                                item.actualCost === null ||
+                                item.actualCost === undefined
+                                  ? "—"
+                                  : displayCurrency(
                                       item.actualCost
                                     )}
-                                  </td>
+                              </td>
 
-                                  <td>
-                                    {displayValue(
-                                      item.notes
-                                    )}
-                                  </td>
-                                </tr>
-                              )
-                            )}
-                        </tbody>
-
-                        <tfoot>
-                          <tr>
-                            <td>
-                              <strong>
-                                Total
-                              </strong>
-                            </td>
-
-                            <td>
-                              <strong>
-                                {displayCurrency(
-                                  estimatedTotal
+                              <td>
+                                {displayValue(
+                                  item.notes
                                 )}
-                              </strong>
-                            </td>
+                              </td>
+                            </tr>
+                          )
+                        )}
+                      </tbody>
 
-                            <td>
-                              <strong>
-                                {displayCurrency(
-                                  actualTotal
-                                )}
-                              </strong>
-                            </td>
+                      <tfoot>
+                        <tr>
+                          <td>
+                            <strong>
+                              Total
+                            </strong>
+                          </td>
 
-                            <td></td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  ) : (
-                    <p className="preview-empty">
-                      No budget items entered.
-                    </p>
-                  )}
+                          <td>
+                            <strong>
+                              {displayCurrency(
+                                estimatedTotal
+                              )}
+                            </strong>
+                          </td>
+
+                          <td>
+                            <strong>
+                              {displayCurrency(
+                                actualTotal
+                              )}
+                            </strong>
+                          </td>
+
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
                 </section>
 
                 <div className="report-preview-footer">
@@ -3323,20 +3487,13 @@ function CommitteeReportEntry({ onBack, onHome }) {
                     Continue to Finalization →
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    className="primary-action-button"
-                    onClick={handleSubmitReport}
-                    disabled={!reportId || isReadOnly}
-                  >
-                    {reportStatus === "locked"
-                      ? "Report Locked"
-                      : isReadOnly
-                        ? "Report Submitted"
-                        : reportStatus === "returned_for_changes"
-                          ? "Resubmit Report"
-                          : "Submit Report"}
-                  </button>
+                  <>
+                    {reportStatus !== "locked" && (
+                      <button type="button" className="primary-action-button" onClick={handleSubmitReport} disabled={!reportId || isReadOnly}>
+                        {isReadOnly ? "Report Submitted" : reportStatus === "returned_for_changes" ? "Resubmit Report" : "Submit Report"}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </section>

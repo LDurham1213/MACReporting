@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { FaHome, FaFileAlt, FaSearch, FaChartBar, FaQuestionCircle, FaSignOutAlt, FaPlus, FaEdit, FaEye } from "react-icons/fa";
+import macLogo from "../assets/MAC_LOGO.png";
 const API_BASE = "http://127.0.0.1:5001";
 function ReportOptions({ selectedReportType, onCreateNew, onOpenExisting, onBack }) {
   const isCommittee = selectedReportType === "committee";
@@ -60,7 +61,7 @@ function ReportOptions({ selectedReportType, onCreateNew, onOpenExisting, onBack
   return (
     <div className="home-layout">
       <aside className="sidebar">
-        <div className="sidebar-brand"><div className="chapter-logo-placeholder">Organization Logo</div><h1>MACReporting</h1></div>
+        <div className="sidebar-brand"><img src={macLogo} alt="MAC Logo" className="chapter-logo" /><h1>MACReporting</h1></div>
         <nav className="sidebar-nav">
           <button className="nav-item" onClick={onBack}><span><FaHome /></span>Home</button>
           <button className="nav-item active"><span><FaFileAlt /></span>Reports</button>
