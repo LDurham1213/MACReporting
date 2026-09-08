@@ -2566,11 +2566,7 @@ function PostMortemReportEntry({ onBack, onHome, currentUserId }) {
                   <button
                     type="button"
                     className="primary-action-button"
-                    onClick={() =>
-                      setCurrentSection(
-                        "Finalization Action"
-                      )
-                    }
+                    onClick={() => setCurrentSection("Finalization Action")}
                   >
                     Continue to Finalization →
                   </button>
