@@ -1,37 +1,33 @@
 from flask import Blueprint, jsonify
-from db import get_db_connection
+from sqlalchemy import select
+
+from db import get_db_session
+from models import Committee, User
 
 lookups_bp = Blueprint("lookups", __name__)
 
 @lookups_bp.route("/users", methods=["GET"])
 def get_users():
-    with get_db_connection() as connection:
-        users = connection.execute(
-            """
-            SELECT
-                user_id,
-                f_name AS first_name,
-                l_name AS last_name,
-                email
-            FROM users
-            WHERE active = TRUE
-            ORDER BY l_name, f_name
-            """
-        ).fetchall()
-    return jsonify(users)
+    session = get_db_session()
+    try:
+        users = session.execute(
+            select(User.user_id, User.f_name.label("first_name"), User.l_name.label("last_name"), User.email)
+            .where(User.active.is_(True))
+            .order_by(User.l_name, User.f_name)
+        ).mappings().all()
+        return jsonify([dict(user) for user in users])
+    finally:
+        session.close()
 
 @lookups_bp.route("/committees", methods=["GET"])
 def get_committees():
-    with get_db_connection() as connection:
-        committees = connection.execute(
-            """
-            SELECT
-                committee_id,
-                committee_name,
-                comm_abbr
-            FROM committees
-            WHERE active = TRUE
-            ORDER BY committee_name
-            """
-        ).fetchall()
-    return jsonify(committees)
+    session = get_db_session()
+    try:
+        committees = session.execute(
+            select(Committee.committee_id, Committee.committee_name, Committee.comm_abbr)
+            .where(Committee.active.is_(True))
+            .order_by(Committee.committee_name)
+        ).mappings().all()
+        return jsonify([dict(committee) for committee in committees])
+    finally:
+        session.close()
