@@ -1,10 +1,7 @@
 from flask import Blueprint, jsonify
-
 from db import get_db_connection
 
-
 lookups_bp = Blueprint("lookups", __name__)
-
 
 @lookups_bp.route("/users", methods=["GET"])
 def get_users():
@@ -21,9 +18,7 @@ def get_users():
             ORDER BY l_name, f_name
             """
         ).fetchall()
-
     return jsonify(users)
-
 
 @lookups_bp.route("/committees", methods=["GET"])
 def get_committees():
@@ -32,11 +27,11 @@ def get_committees():
             """
             SELECT
                 committee_id,
-                committee_name
+                committee_name,
+                comm_abbr
             FROM committees
             WHERE active = TRUE
             ORDER BY committee_name
             """
         ).fetchall()
-
     return jsonify(committees)

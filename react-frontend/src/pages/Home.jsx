@@ -9,6 +9,7 @@ import {
   FaCalendarAlt,
   FaClipboardCheck
 } from "react-icons/fa";
+import macLogo from "../assets/MAC_LOGO.png";
 
 function Home({ onSelectReportType, onApprovals }) {
   return (
@@ -16,9 +17,10 @@ function Home({ onSelectReportType, onApprovals }) {
       {/* SIDEBAR */}
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <div className="chapter-logo-placeholder">
+          {/* <div className="chapter-logo-placeholder">
             Organization Logo
-          </div>
+          </div> */}
+          <img src={macLogo} alt="MAC Logo" className="chapter-logo" />
           <h1>MACReporting</h1>
         </div>
 

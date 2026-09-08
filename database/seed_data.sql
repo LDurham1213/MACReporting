@@ -56,6 +56,8 @@ INSERT INTO questions (question_code) VALUES
   ('RECENT_SUCCESSES'),
   ('CHALLENGES'),
   ('RESOURCES_NEEDED'),
+  ('FINANCIAL_REQUEST'),
+  ('FINANCIAL_REQUEST_DESCRIPTION'),
 
   ('REPORT_DATE'),
   ('SUBMITTED_BY'),
@@ -72,6 +74,7 @@ INSERT INTO questions (question_code) VALUES
   ('CHAPTER_EXPENSES'),
   ('INTERNAL_COMMITTEE_PARTNERSHIPS'),
   ('KEY_METRICS'),
+  ('VOLUNTEER_HOURS'),
   ('EVALUATIONS'),
   ('SOCIAL_MEDIA'),
   ('RESULTS_OUTCOMES'),
@@ -115,6 +118,8 @@ FROM (
     ('RECENT_SUCCESSES', 'Recent Successes', 'textarea'),
     ('CHALLENGES', 'Challenges', 'textarea'),
     ('RESOURCES_NEEDED', 'Resources Needed', 'textarea'),
+    ('FINANCIAL_REQUEST', 'Financial Request', 'currency'),
+    ('FINANCIAL_REQUEST_DESCRIPTION', 'Financial Request Description', 'textarea'),
 
     ('REPORT_DATE', 'Report Date', 'date'),
     ('SUBMITTED_BY', 'Submitted By', 'text'),
@@ -131,6 +136,7 @@ FROM (
     ('CHAPTER_EXPENSES', 'Chapter Expenses', 'currency'),
     ('INTERNAL_COMMITTEE_PARTNERSHIPS', 'Internal Committee Partnerships', 'textarea'),
     ('KEY_METRICS', 'Key Metrics', 'textarea'),
+    ('VOLUNTEER_HOURS', 'Volunteer Hours of Effort', 'number'),
     ('EVALUATIONS', 'Evaluations', 'textarea'),
     ('SOCIAL_MEDIA', 'Social Media', 'textarea'),
     ('RESULTS_OUTCOMES', 'Results Outcomes', 'textarea'),
@@ -183,7 +189,9 @@ FROM (
     ('GOALS', 'Goals', 11, TRUE),
     ('RECENT_SUCCESSES', 'Recent Successes', 12, TRUE),
     ('CHALLENGES', 'Challenges', 13, FALSE),
-    ('RESOURCES_NEEDED', 'Resources Needed', 14, FALSE)
+    ('RESOURCES_NEEDED', 'Resources Needed', 14, FALSE),
+    ('FINANCIAL_REQUEST', 'Resources Needed', 15, FALSE),
+    ('FINANCIAL_REQUEST_DESCRIPTION', 'Resources Needed', 16, FALSE)
 ) AS rq(question_code, section_name, display_order, required)
 JOIN questions q ON q.question_code = rq.question_code
 CROSS JOIN report_templates rt
@@ -232,15 +240,16 @@ FROM (
     ('CHAPTER_EXPENSES', 'Financial Information / Metrics', 14, FALSE),
     ('INTERNAL_COMMITTEE_PARTNERSHIPS', 'Outcome / Metrics', 15, FALSE),
     ('KEY_METRICS', 'Outcome / Metrics', 16, FALSE),
-    ('EVALUATIONS', 'Outcome / Metrics', 17, FALSE),
-    ('SOCIAL_MEDIA', 'Outcome / Metrics', 18, FALSE),
-    ('RESULTS_OUTCOMES', 'Outcome / Metrics', 19, FALSE),
-    ('EXTERNAL_COVERAGE_PR', 'Outcome / Metrics', 20, FALSE),
-    ('EVENT_STRENGTHS_SUCCESSES', 'Outcome / Metrics', 21, FALSE),
-    ('LESSONS_LEARNED', 'Outcome / Metrics', 22, FALSE),
-    ('KEY_RECOMMENDATIONS', 'Outcome / Metrics', 23, FALSE),
-    ('PARTICIPANT_FEEDBACK', 'Outcome / Metrics', 24, FALSE),
-    ('COMMITTEE_FEEDBACK', 'Committee Feedback', 25, FALSE)
+    ('VOLUNTEER_HOURS', 'Outcome / Metrics', 17, FALSE),
+    ('EVALUATIONS', 'Outcome / Metrics', 18, FALSE),
+    ('SOCIAL_MEDIA', 'Outcome / Metrics', 19, FALSE),
+    ('RESULTS_OUTCOMES', 'Outcome / Metrics', 20, FALSE),
+    ('EXTERNAL_COVERAGE_PR', 'Outcome / Metrics', 21, FALSE),
+    ('EVENT_STRENGTHS_SUCCESSES', 'Outcome / Metrics', 22, FALSE),
+    ('LESSONS_LEARNED', 'Outcome / Metrics', 23, FALSE),
+    ('KEY_RECOMMENDATIONS', 'Outcome / Metrics', 24, FALSE),
+    ('PARTICIPANT_FEEDBACK', 'Outcome / Metrics', 25, FALSE),
+    ('COMMITTEE_FEEDBACK', 'Committee Feedback', 26, FALSE)
 ) AS rq(question_code, section_name, display_order, required)
 JOIN questions q ON q.question_code = rq.question_code
 CROSS JOIN report_templates rt

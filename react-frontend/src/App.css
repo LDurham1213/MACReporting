@@ -30,6 +30,11 @@
   color: #777777;
   font-size: 14px;
 }
+.chapter-logo {
+  width: 160px;
+  height: auto;
+  object-fit: contain;
+}
 .sidebar-brand h1 {
   margin: 0;
   color: #a80f1b;
@@ -429,6 +434,13 @@
   text-align: center;
   box-sizing: border-box;
 }
+
+.entry-logo {
+  width: 160px;
+  height: auto;
+  object-fit: contain;
+}
+
 .entry-report-title { text-align: left; }
 .entry-header h1 {
   margin: 0 0 4px;
