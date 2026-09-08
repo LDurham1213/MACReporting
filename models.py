@@ -273,3 +273,17 @@ class ReportBudgetItem(Base):
     disp_ord: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     create_dt: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.current_timestamp())
     upd_dt: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.current_timestamp())
+
+class ReportSectionProgress(Base):
+    __tablename__ = "report_section_progress"
+    __table_args__ = (
+        UniqueConstraint("report_id", "section_name", name="uq_report_section_progress"),
+        Index("idx_report_section_progress_report", "report_id"),
+    )
+
+    report_section_progress_id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
+    report_id: Mapped[int] = mapped_column(ForeignKey("reports.report_id", ondelete="CASCADE"), nullable=False)
+    section_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.user_id"))
