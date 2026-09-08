@@ -328,7 +328,7 @@ def _add_header(
     if "post" in template_name and "mortem" in template_name:
         display_title = "Program Post-Mortem Report"
     elif "committee" in template_name:
-        display_title = "Meeting Report"
+        display_title = "Committee Report"
     else:
         display_title = str(report.get("template_name") or "Report")
 
