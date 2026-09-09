@@ -412,120 +412,54 @@ def approve_report(report_id):
 # =========================================================
 # REPORT LOCK
 # =========================================================
-def get_lock_error(connection, acting_user_id):
+def get_lock_error(session, acting_user_id):
     if not acting_user_id:
-        return jsonify({
-            "error": "changed_by_user_id is required"
-        }), 400
-    authorized_role = connection.execute(
-        """
-        SELECT role
-        FROM user_roles
-        WHERE user_id = %s
-          AND role IN (
-              'president',
-              'technology_chair',
-              'technology_admin'
-          )
-          AND active = TRUE
-          AND eff_start_dt <= CURRENT_DATE
-          AND (
-              eff_end_dt IS NULL
-              OR eff_end_dt >= CURRENT_DATE
-          )
-        LIMIT 1
-        """,
-        (acting_user_id,)
-    ).fetchone()
+        return jsonify({"error": "changed_by_user_id is required"}), 400
+    today = date.today()
+    authorized_role = session.scalar(
+        select(UserRole).where(
+            UserRole.user_id == acting_user_id,
+            UserRole.role.in_(("president", "technology_chair", "technology_admin")),
+            UserRole.active.is_(True),
+            UserRole.eff_start_dt <= today,
+            (UserRole.eff_end_dt.is_(None)) | (UserRole.eff_end_dt >= today)
+        ).limit(1)
+    )
     if not authorized_role:
-        return jsonify({
-            "error": (
-                "User is not authorized "
-                "to lock reports"
-            )
-        }), 403
+        return jsonify({"error": "User is not authorized to lock reports"}), 403
     return None
-@reports_bp.route(
-    "/reports/<int:report_id>/lock",
-methods=["POST"]
-)
+
+@reports_bp.route("/reports/<int:report_id>/lock", methods=["POST"])
 def lock_report(report_id):
     data = request.get_json(silent=True) or {}
     changed_by_user_id = data.get("changed_by_user_id")
-    with get_db_connection() as connection:
-        lock_error = get_lock_error(
-            connection,
-            changed_by_user_id
-        )
+    with get_db_session() as session:
+        lock_error = get_lock_error(session, changed_by_user_id)
         if lock_error:
             return lock_error
-        report = connection.execute(
-            """
-            SELECT
-                report_id,
-                status,
-                locked
-            FROM reports
-            WHERE report_id = %s
-            FOR UPDATE
-            """,
-            (report_id,)
-        ).fetchone()
+        report = session.scalar(select(Report).where(Report.report_id == report_id).with_for_update())
         if not report:
-            return jsonify({
-                "error": "Report not found"
-            }), 404
-        if report["locked"]:
-            return jsonify({
-                "error": "Report is already locked"
-            }), 409
-        if report["status"] != "approved":
-            return jsonify({
-                "error": (
-                    "Only Approved reports "
-                    "can be locked"
-                )
-            }), 409
-        updated_report = connection.execute(
-            """
-            UPDATE reports
-            SET status = 'locked',
-                locked = TRUE,
-                locked_by_user_id = %s,
-                locked_at = CURRENT_TIMESTAMP,
-                upd_dt = CURRENT_TIMESTAMP
-            WHERE report_id = %s
-            RETURNING *
-            """,
-            (
-                changed_by_user_id,
-report_id
-            )
-        ).fetchone()
-        connection.execute(
-            """
-            INSERT INTO report_status_history (
-                report_id,
-                from_status,
-                to_status,
-                chgd_by_uid,
-                comments
-            )
-            VALUES (
-                %s,
-                'approved',
-                'locked',
-                %s,
-                %s
-            )
-            """,
-            (
-report_id,
-                changed_by_user_id,
-                data.get("comments")
-            )
-        )
-    return jsonify(api_row(updated_report)), 200
+            return jsonify({"error": "Report not found"}), 404
+        if report.locked:
+            return jsonify({"error": "Report is already locked"}), 409
+        if report.status != "approved":
+            return jsonify({"error": "Only Approved reports can be locked"}), 409
+        now = datetime.now(timezone.utc)
+        report.status = "locked"
+        report.locked = True
+        report.locked_by_user_id = changed_by_user_id
+        report.locked_at = now
+        report.upd_dt = now
+        session.add(ReportStatusHistory(
+            report_id=report_id,
+            from_status="approved",
+            to_status="locked",
+            chgd_by_uid=changed_by_user_id,
+            comments=data.get("comments")
+        ))
+        session.commit()
+        session.refresh(report)
+        return jsonify(api_row(report)), 200
 
 # =========================================================
 # ANSWERS
