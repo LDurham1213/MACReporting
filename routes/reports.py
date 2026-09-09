@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from db import get_db_session
-from models import Committee, Report, ReportStatusHistory, User, UserRole
+from models import Answer, Committee, QuestionVersion, Report, ReportStatusHistory, User, UserRole
 from pdf_services.pdf_service import generate_report_pdf
 
 reports_bp = Blueprint("reports", __name__)
@@ -464,87 +464,58 @@ def lock_report(report_id):
 # =========================================================
 # ANSWERS
 # =========================================================
-@reports_bp.route(
-    "/reports/<int:report_id>/answers",
-methods=["POST"]
-)
+@reports_bp.route("/reports/<int:report_id>/answers", methods=["POST"])
 def save_answer(report_id):
     data = request.get_json(silent=True) or {}
-    with get_db_connection() as connection:
-        edit_error = get_edit_error(
-            connection,
-report_id
-        )
+    with get_db_session() as session:
+        edit_error = get_edit_error(session, report_id)
         if edit_error:
             return edit_error
-        answer = connection.execute(
-            """
-            INSERT INTO answers (
-                report_id,
-                question_id,
-                question_version,
-                answer_value,
-                answered_by,
-                notes
+        answer = session.scalar(
+            select(Answer).where(
+                Answer.report_id == report_id,
+                Answer.question_id == data["question_id"],
+                Answer.question_version == data["question_version"]
             )
-            VALUES (
-                %s,
-                %s,
-                %s,
-                %s,
-                %s,
-                %s
+        )
+        if answer:
+            answer.answer_value = data.get("answer_value")
+            answer.answered_by = data["answered_by"]
+            answer.notes = data.get("notes")
+            answer.answer_dt = datetime.now(timezone.utc)
+        else:
+            answer = Answer(
+                report_id=report_id,
+                question_id=data["question_id"],
+                question_version=data["question_version"],
+                answer_value=data.get("answer_value"),
+                answered_by=data["answered_by"],
+                notes=data.get("notes")
             )
-            ON CONFLICT (
-                report_id,
-                question_id,
-                question_version
-            )
-            DO UPDATE SET
-                answer_value = EXCLUDED.answer_value,
-                answered_by = EXCLUDED.answered_by,
-                notes = EXCLUDED.notes,
-                answer_dt = CURRENT_TIMESTAMP
-            RETURNING *
-            """,
-            (
-report_id,
-                data["question_id"],
-                data["question_version"],
-                data.get("answer_value"),
-                data["answered_by"],
-                data.get("notes")
-            )
-        ).fetchone()
-    return jsonify(api_row(answer)), 200
-@reports_bp.route(
-    "/reports/<int:report_id>/answers",
-methods=["GET"]
-)
+            session.add(answer)
+        session.commit()
+        session.refresh(answer)
+        return jsonify(api_row(answer)), 200
+
+@reports_bp.route("/reports/<int:report_id>/answers", methods=["GET"])
 def get_report_answers(report_id):
-    with get_db_connection() as connection:
-        answers = connection.execute(
-            """
-            SELECT
-                a.answer_id,
-                a.report_id,
-                a.question_id,
-                a.question_version,
-                qv.question_text,
-                a.answer_value,
-                a.answer_dt AS answer_date,
-                a.answered_by,
-                a.notes
-            FROM answers a
-            JOIN question_versions qv
-              ON qv.question_id = a.question_id
-             AND qv.version = a.question_version
-            WHERE a.report_id = %s
-            ORDER BY a.question_id
-            """,
-            (report_id,)
-        ).fetchall()
-    return jsonify(answers)
+    with get_db_session() as session:
+        rows = session.execute(
+            select(Answer, QuestionVersion)
+            .join(
+                QuestionVersion,
+                (QuestionVersion.question_id == Answer.question_id)
+                & (QuestionVersion.version == Answer.question_version)
+            )
+            .where(Answer.report_id == report_id)
+            .order_by(Answer.question_id)
+        ).all()
+        answers = []
+        for answer, question_version in rows:
+            row = api_row(answer)
+            row["question_text"] = question_version.question_text
+            answers.append(row)
+        return jsonify(answers), 200
 
 # =========================================================
 # REPORT ACTION ITEMS
