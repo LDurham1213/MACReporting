@@ -4,9 +4,7 @@ import { FaHome, FaFileAlt, FaClipboardCheck, FaEye, FaFilePdf, FaQuestionCircle
 
 const API_BASE = "http://127.0.0.1:5001";
 
-function Approvals({ onHome, onOpenReport, onOpenLockReport }) {
-  const [users, setUsers] = useState([]);
-  const [viewingAsUserId, setViewingAsUserId] = useState("");
+function Approvals({ currentUserId, onHome, onOpenReport, onOpenLockReport, onLogout }) {
   const [awaitingAction, setAwaitingAction] = useState([]);
   const [lockedReports, setLockedReports] = useState([]);
   const [canGeneratePdf, setCanGeneratePdf] = useState(false);
@@ -15,32 +13,19 @@ function Approvals({ onHome, onOpenReport, onOpenLockReport }) {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    fetch(`${API_BASE}/users`)
-      .then(response => response.json())
-      .then(data => setUsers(data))
-      .catch(error => {
-        console.error("Error loading users:", error);
-        setErrorMessage("Unable to load demo users.");
-      });
-  }, []);
-
-  useEffect(() => {
-    if (!viewingAsUserId) {
-      setAwaitingAction([]);
-      setLockedReports([]);
-      setCanGeneratePdf(false);
-      return;
-    }
+    if (!currentUserId) return;
 
     async function loadQueues() {
       try {
         setLoading(true);
         setErrorMessage("");
+
         const [approvalsResponse, lockResponse, reportsResponse] = await Promise.all([
-          fetch(`${API_BASE}/approvals?user_id=${viewingAsUserId}`),
-          fetch(`${API_BASE}/reports/awaiting-lock?user_id=${viewingAsUserId}`),
+          fetch(`${API_BASE}/approvals?user_id=${currentUserId}`),
+          fetch(`${API_BASE}/reports/awaiting-lock?user_id=${currentUserId}`),
           fetch(`${API_BASE}/reports`)
         ]);
+
         const approvalsData = await approvalsResponse.json();
         const lockData = await lockResponse.json();
         const reportsData = await reportsResponse.json();
@@ -49,10 +34,8 @@ function Approvals({ onHome, onOpenReport, onOpenLockReport }) {
         if (!lockResponse.ok) throw new Error(lockData.error || "Unable to load reports awaiting lock.");
         if (!reportsResponse.ok) throw new Error(reportsData.error || "Unable to load reports.");
 
-        const userId = Number(viewingAsUserId);
-        const returnedReports = reportsData.filter(report =>
-          report.status === "returned_for_changes" && Number(report.created_by_user_id) === userId
-        );
+        const userId = Number(currentUserId);
+        const returnedReports = reportsData.filter(report => report.status === "returned_for_changes" && Number(report.created_by_user_id) === userId);
         const submittedReports = approvalsData.approvals || [];
         const approvedReports = lockData.awaiting_lock || [];
         const combined = [...returnedReports, ...submittedReports, ...approvedReports];
@@ -73,16 +56,12 @@ function Approvals({ onHome, onOpenReport, onOpenLockReport }) {
     }
 
     loadQueues();
-  }, [viewingAsUserId]);
+  }, [currentUserId]);
 
   function formatPeriod(value) {
     if (!value) return "—";
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("en-US", {
-      month: "short",
-      year: "numeric",
-      timeZone: "UTC"
-    });
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
   }
 
   function displayStatus(status) {
@@ -90,11 +69,13 @@ function Approvals({ onHome, onOpenReport, onOpenLockReport }) {
   }
 
   function openReport(report) {
-    const userId = Number(viewingAsUserId);
+    const userId = Number(currentUserId);
+
     if (report.status === "approved" || report.status === "locked" || report.locked) {
       onOpenLockReport(report, userId);
       return;
     }
+
     onOpenReport(report, userId);
   }
 
@@ -127,10 +108,11 @@ function Approvals({ onHome, onOpenReport, onOpenLockReport }) {
     try {
       setGeneratingReportId(report.report_id);
       setErrorMessage("");
+
       const response = await fetch(`${API_BASE}/reports/${report.report_id}/pdf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ changed_by_user_id: Number(viewingAsUserId) })
+        body: JSON.stringify({ changed_by_user_id: Number(currentUserId) })
       });
 
       if (!response.ok) {
@@ -158,37 +140,26 @@ function Approvals({ onHome, onOpenReport, onOpenLockReport }) {
   function ReportTable({ reports, emptyMessage, showGeneratePdf = false }) {
     return (
       <div className="reports-table">
-        <div className="reports-table-header">
-          <span>Report Title</span>
-          <span>Committee</span>
-          <span>Period</span>
-          <span>Status</span>
-          <span>Action</span>
-        </div>
+        <div className="reports-table-header"><span>Report Title</span><span>Committee</span><span>Period</span><span>Status</span><span>Action</span></div>
+
         {reports.length === 0 ? (
           <div className="reports-empty-row">{emptyMessage}</div>
-        ) : (
-          reports.map(report => (
-            <div className="reports-table-row" key={report.report_id}>
-              <span>{report.report_title}</span>
-              <span>{report.committee_name}</span>
-              <span>{formatPeriod(report.reporting_period)}</span>
-              <span><span className={`status-badge ${report.status}`}>{displayStatus(report.status)}</span></span>
-              <span className="report-actions">
-                <button title="View report" onClick={() => openReport(report)}><FaEye /></button>
-                {showGeneratePdf && canGeneratePdf && (
-                  <button
-                    title="Generate PDF"
-                    onClick={() => generatePdf(report)}
-                    disabled={generatingReportId === report.report_id}
-                  >
-                    <FaFilePdf />
-                  </button>
-                )}
-              </span>
-            </div>
-          ))
-        )}
+        ) : reports.map(report => (
+          <div className="reports-table-row" key={report.report_id}>
+            <span>{report.report_title}</span>
+            <span>{report.committee_name}</span>
+            <span>{formatPeriod(report.reporting_period)}</span>
+            <span><span className={`status-badge ${report.status}`}>{displayStatus(report.status)}</span></span>
+            <span className="report-actions">
+              <button title="View report" onClick={() => openReport(report)}><FaEye /></button>
+              {showGeneratePdf && canGeneratePdf && (
+                <button title="Generate PDF" onClick={() => generatePdf(report)} disabled={generatingReportId === report.report_id}>
+                  <FaFilePdf />
+                </button>
+              )}
+            </span>
+          </div>
+        ))}
       </div>
     );
   }
@@ -197,14 +168,16 @@ function Approvals({ onHome, onOpenReport, onOpenLockReport }) {
     <div className="home-layout">
       <aside className="sidebar">
         <div className="sidebar-brand"><img src={macLogo} alt="MAC Logo" className="chapter-logo" /><h1>MACReporting</h1></div>
+
         <nav className="sidebar-nav">
           <button className="nav-item" onClick={onHome}><span><FaHome /></span>Home</button>
           <button className="nav-item"><span><FaFileAlt /></span>Reports</button>
           <button className="nav-item active"><span><FaClipboardCheck /></span>Approvals</button>
         </nav>
+
         <div className="sidebar-footer">
           <button className="nav-item"><span><FaQuestionCircle /></span>Help / Support</button>
-          <button className="nav-item"><span><FaSignOutAlt /></span>Log Out</button>
+          <button className="nav-item" onClick={onLogout}><span><FaSignOutAlt /></span>Log Out</button>
         </div>
       </aside>
 
@@ -213,36 +186,22 @@ function Approvals({ onHome, onOpenReport, onOpenLockReport }) {
           <div><h2>Approvals</h2><p>Review and finalize chapter reports.</p></div>
         </div>
 
-        <section className="report-filters">
-          <div className="filter-group">
-            <label>Viewing As</label>
-            <select value={viewingAsUserId} onChange={event => setViewingAsUserId(event.target.value)}>
-              <option value="">Select demo user</option>
-              {users.map(user => (
-                <option key={user.user_id} value={user.user_id}>{`${user.first_name || ""} ${user.last_name || ""}`.trim()}</option>
-              ))}
-            </select>
-          </div>
-          <p className="approval-demo-note">Demo user only — this will be replaced by the logged-in user in production.</p>
-        </section>
-
         {errorMessage && <div className="form-validation-message">{errorMessage}</div>}
 
         <section className="existing-reports">
           <h3>Awaiting My Action</h3>
-          {!viewingAsUserId ? (
-            <div className="reports-empty-row">Select a demo user to view their action queue.</div>
-          ) : loading ? (
+
+          {loading ? (
             <p>Loading reports...</p>
           ) : (
             <>
-              <ReportTable reports={awaitingAction} emptyMessage="No reports are currently awaiting this user's action." />
+              <ReportTable reports={awaitingAction} emptyMessage="No reports are currently awaiting your action." />
               <div className="reports-table-footer"><p>{awaitingAction.length} report{awaitingAction.length === 1 ? "" : "s"} awaiting action</p></div>
             </>
           )}
         </section>
 
-        {viewingAsUserId && !loading && (
+        {!loading && (
           <section className="existing-reports">
             <h3>Locked Reports</h3>
             <ReportTable reports={lockedReports} emptyMessage="No locked reports are currently available." showGeneratePdf />

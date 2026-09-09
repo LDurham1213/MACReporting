@@ -5,6 +5,7 @@ import ReportOptions from "./pages/ReportOptions";
 import CommitteeReportEntry from "./pages/CommitteeReportEntry";
 import PostMortemReportEntry from "./pages/PostMortemReportEntry";
 import Approvals from "./pages/Approvals";
+import UserSelect from "./pages/UserSelect";
 import "./App.css";
 
 const REPORT_TYPE_STORAGE_KEY = "macreporting_selected_report_type";
@@ -15,23 +16,14 @@ const LOCK_USER_STORAGE_KEY = "macreporting_lock_user_id";
 const CURRENT_USER_STORAGE_KEY = "macreporting_current_user_id";
 
 function App() {
-  // =========================================================
-  // STATE
-  // =========================================================
-
-  const [currentPage, setCurrentPage] = useState("home");
-
-  const [selectedReportType, setSelectedReportType] = useState(
-    () => localStorage.getItem(REPORT_TYPE_STORAGE_KEY) || null
-  );
-
+  const [currentPage, setCurrentPage] = useState(() => localStorage.getItem(CURRENT_USER_STORAGE_KEY) ? "home" : "user-select");
+  const [selectedReportType, setSelectedReportType] = useState(() => localStorage.getItem(REPORT_TYPE_STORAGE_KEY) || null);
   const [reportTemplates, setReportTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState(null);
   const [templateName, setTemplateName] = useState("");
   const [templateDescription, setTemplateDescription] = useState("");
-
   const [questions, setQuestions] = useState([]);
   const [showQuestionForm, setShowQuestionForm] = useState(false);
   const [editingQuestionId, setEditingQuestionId] = useState(null);
@@ -41,34 +33,17 @@ function App() {
   const [questionRequired, setQuestionRequired] = useState(0);
   const [questionOrder, setQuestionOrder] = useState("");
   const [addingNewSection, setAddingNewSection] = useState(false);
-
-  const [currentUserId, setCurrentUserId] = useState(
-    () => localStorage.getItem(CURRENT_USER_STORAGE_KEY) || ""
-  );
-
-  // =========================================================
-  // PERSIST STATE
-  // =========================================================
+  const [currentUserId, setCurrentUserId] = useState(() => localStorage.getItem(CURRENT_USER_STORAGE_KEY) || "");
 
   useEffect(() => {
-    if (selectedReportType) {
-      localStorage.setItem(REPORT_TYPE_STORAGE_KEY, selectedReportType);
-    } else {
-      localStorage.removeItem(REPORT_TYPE_STORAGE_KEY);
-    }
+    if (selectedReportType) localStorage.setItem(REPORT_TYPE_STORAGE_KEY, selectedReportType);
+    else localStorage.removeItem(REPORT_TYPE_STORAGE_KEY);
   }, [selectedReportType]);
 
   useEffect(() => {
-    if (currentUserId) {
-      localStorage.setItem(CURRENT_USER_STORAGE_KEY, currentUserId);
-    } else {
-      localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
-    }
+    if (currentUserId) localStorage.setItem(CURRENT_USER_STORAGE_KEY, currentUserId);
+    else localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
   }, [currentUserId]);
-
-  // =========================================================
-  // LOAD REPORT TEMPLATES
-  // =========================================================
 
   useEffect(() => {
     fetch("http://127.0.0.1:5001/report-templates")
@@ -77,9 +52,22 @@ function App() {
       .catch(error => console.error("Error loading report templates:", error));
   }, []);
 
-  // =========================================================
-  // NAVIGATION
-  // =========================================================
+  function selectCurrentUser(userId) {
+    setCurrentUserId(String(userId));
+    setCurrentPage("home");
+  }
+
+  function logout() {
+    localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
+    localStorage.removeItem(REPORT_TYPE_STORAGE_KEY);
+    localStorage.removeItem(COMMITTEE_REPORT_STORAGE_KEY);
+    localStorage.removeItem(POSTMORTEM_REPORT_STORAGE_KEY);
+    localStorage.removeItem(REVIEWER_USER_STORAGE_KEY);
+    localStorage.removeItem(LOCK_USER_STORAGE_KEY);
+    setCurrentUserId("");
+    setSelectedReportType(null);
+    setCurrentPage("user-select");
+  }
 
   function selectReportType(reportType) {
     setSelectedReportType(reportType);
@@ -99,13 +87,9 @@ function App() {
   }
 
   function openApprovalReport(report, reviewerUserId) {
-    const reportType =
-      Number(report.report_template_id) === 2 ? "post-mortem" : "committee";
-
+    const reportType = Number(report.report_template_id) === 2 ? "post-mortem" : "committee";
     localStorage.removeItem(LOCK_USER_STORAGE_KEY);
     localStorage.setItem(REVIEWER_USER_STORAGE_KEY, String(reviewerUserId));
-
-    setCurrentUserId(String(reviewerUserId));
     setSelectedReportType(reportType);
 
     if (reportType === "committee") {
@@ -119,13 +103,9 @@ function App() {
   }
 
   function openLockReport(report, lockUserId) {
-    const reportType =
-      Number(report.report_template_id) === 2 ? "post-mortem" : "committee";
-
+    const reportType = Number(report.report_template_id) === 2 ? "post-mortem" : "committee";
     localStorage.removeItem(REVIEWER_USER_STORAGE_KEY);
     localStorage.setItem(LOCK_USER_STORAGE_KEY, String(lockUserId));
-
-    setCurrentUserId(String(lockUserId));
     setSelectedReportType(reportType);
 
     if (reportType === "committee") {
@@ -174,10 +154,6 @@ function App() {
     setCurrentPage("report-options");
   }
 
-  // =========================================================
-  // REPORT TEMPLATE FUNCTIONS
-  // =========================================================
-
   function loadQuestions(template) {
     setShowTemplateForm(false);
     setShowQuestionForm(false);
@@ -203,28 +179,18 @@ function App() {
   function saveTemplate(event) {
     event.preventDefault();
 
-    const url = editingTemplateId
-      ? `http://127.0.0.1:5001/report-templates/${editingTemplateId}`
-      : "http://127.0.0.1:5001/report-templates";
-
+    const url = editingTemplateId ? `http://127.0.0.1:5001/report-templates/${editingTemplateId}` : "http://127.0.0.1:5001/report-templates";
     const method = editingTemplateId ? "PUT" : "POST";
 
     fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: templateName,
-        description: templateDescription
-      })
+      body: JSON.stringify({ name: templateName, description: templateDescription })
     })
       .then(response => response.json())
       .then(savedTemplate => {
         if (editingTemplateId) {
-          setReportTemplates(
-            reportTemplates.map(template =>
-              template.id === editingTemplateId ? savedTemplate : template
-            )
-          );
+          setReportTemplates(reportTemplates.map(template => template.id === editingTemplateId ? savedTemplate : template));
           setSelectedTemplate(savedTemplate);
         } else {
           setReportTemplates([...reportTemplates, savedTemplate]);
@@ -239,14 +205,10 @@ function App() {
   }
 
   function deleteTemplate(templateId) {
-    fetch(`http://127.0.0.1:5001/report-templates/${templateId}`, {
-      method: "DELETE"
-    })
+    fetch(`http://127.0.0.1:5001/report-templates/${templateId}`, { method: "DELETE" })
       .then(response => response.json())
       .then(() => {
-        setReportTemplates(
-          reportTemplates.filter(template => template.id !== templateId)
-        );
+        setReportTemplates(reportTemplates.filter(template => template.id !== templateId));
         setSelectedTemplate(null);
         setQuestions([]);
         setShowTemplateForm(false);
@@ -254,10 +216,6 @@ function App() {
       })
       .catch(error => console.error("Error deleting template:", error));
   }
-
-  // =========================================================
-  // QUESTION FUNCTIONS
-  // =========================================================
 
   function editQuestion(question) {
     setEditingQuestionId(question.id);
@@ -273,10 +231,7 @@ function App() {
   function saveQuestion(event) {
     event.preventDefault();
 
-    const url = editingQuestionId
-      ? `http://127.0.0.1:5001/questions/${editingQuestionId}`
-      : "http://127.0.0.1:5001/questions";
-
+    const url = editingQuestionId ? `http://127.0.0.1:5001/questions/${editingQuestionId}` : "http://127.0.0.1:5001/questions";
     const method = editingQuestionId ? "PUT" : "POST";
 
     fetch(url, {
@@ -294,11 +249,7 @@ function App() {
       .then(response => response.json())
       .then(savedQuestion => {
         if (editingQuestionId) {
-          setQuestions(
-            questions.map(question =>
-              question.id === editingQuestionId ? savedQuestion : question
-            )
-          );
+          setQuestions(questions.map(question => question.id === editingQuestionId ? savedQuestion : question));
         } else {
           setQuestions([...questions, savedQuestion]);
         }
@@ -316,41 +267,18 @@ function App() {
   }
 
   function deleteQuestion(questionId) {
-    fetch(`http://127.0.0.1:5001/questions/${questionId}`, {
-      method: "DELETE"
-    })
+    fetch(`http://127.0.0.1:5001/questions/${questionId}`, { method: "DELETE" })
       .then(response => response.json())
-      .then(() => {
-        setQuestions(
-          questions.filter(question => question.id !== questionId)
-        );
-      })
+      .then(() => setQuestions(questions.filter(question => question.id !== questionId)))
       .catch(error => console.error("Error deleting question:", error));
   }
 
-  // =========================================================
-  // SECTION NAMES
-  // =========================================================
+  const sectionNames = [...new Set(questions.map(question => question.section_name).filter(section => section))];
 
-  const sectionNames = [
-    ...new Set(
-      questions
-        .map(question => question.section_name)
-        .filter(section => section)
-    )
-  ];
-
-  // =========================================================
-  // PAGE ROUTING
-  // =========================================================
+  if (currentPage === "user-select") return <UserSelect onSelectUser={selectCurrentUser} />;
 
   if (currentPage === "home") {
-    return (
-      <Home
-        onSelectReportType={selectReportType}
-        onApprovals={goToApprovals}
-      />
-    );
+    return <Home onSelectReportType={selectReportType} onApprovals={goToApprovals} onLogout={logout} />;
   }
 
   if (currentPage === "report-options") {
@@ -361,6 +289,7 @@ function App() {
         onOpenExisting={openExistingReport}
         onBack={goHome}
         onApprovals={goToApprovals}
+        onLogout={logout}
       />
     );
   }
@@ -368,9 +297,11 @@ function App() {
   if (currentPage === "approvals") {
     return (
       <Approvals
+        currentUserId={currentUserId}
         onHome={goHome}
         onOpenReport={openApprovalReport}
         onOpenLockReport={openLockReport}
+        onLogout={logout}
       />
     );
   }
@@ -397,10 +328,6 @@ function App() {
     );
   }
 
-  // =========================================================
-  // REPORT TEMPLATE ADMINISTRATION
-  // =========================================================
-
   return (
     <div className="app">
       <header className="app-header">
@@ -413,22 +340,12 @@ function App() {
 
       <main className="dashboard">
         <aside className="template-panel">
-          <div className="panel-heading">
-            <h2>Report Templates</h2>
-            <span>{reportTemplates.length}</span>
-          </div>
-
+          <div className="panel-heading"><h2>Report Templates</h2><span>{reportTemplates.length}</span></div>
           <div className="template-list">
             {reportTemplates.map(template => (
-              <ReportTemplate
-                key={template.id}
-                template={template}
-                selected={selectedTemplate?.id === template.id}
-                onViewQuestions={loadQuestions}
-              />
+              <ReportTemplate key={template.id} template={template} selected={selectedTemplate?.id === template.id} onViewQuestions={loadQuestions} />
             ))}
           </div>
-
           <button
             className="primary-button"
             onClick={() => {
@@ -449,32 +366,17 @@ function App() {
             <div className="template-form-panel">
               <p className="section-label">Template Management</p>
               <h2>{editingTemplateId ? "Edit Report Template" : "Add Report Template"}</h2>
-
               <form onSubmit={saveTemplate}>
                 <div className="form-group">
                   <label>Name</label>
-                  <input
-                    type="text"
-                    value={templateName}
-                    onChange={event => setTemplateName(event.target.value)}
-                    required
-                  />
+                  <input type="text" value={templateName} onChange={event => setTemplateName(event.target.value)} required />
                 </div>
-
                 <div className="form-group">
                   <label>Description</label>
-                  <input
-                    type="text"
-                    value={templateDescription}
-                    onChange={event => setTemplateDescription(event.target.value)}
-                  />
+                  <input type="text" value={templateDescription} onChange={event => setTemplateDescription(event.target.value)} />
                 </div>
-
                 <div className="action-buttons">
-                  <button type="submit" className="primary-button">
-                    {editingTemplateId ? "Update Template" : "Save Template"}
-                  </button>
-
+                  <button type="submit" className="primary-button">{editingTemplateId ? "Update Template" : "Save Template"}</button>
                   <button
                     type="button"
                     className="delete-button"
@@ -498,28 +400,15 @@ function App() {
                   <h2>{selectedTemplate.name}</h2>
                   <p>{selectedTemplate.description}</p>
                 </div>
-
                 <div className="action-buttons">
-                  <button className="edit-button" onClick={editTemplate}>
-                    Edit
-                  </button>
-
-                  <button
-                    className="delete-button"
-                    onClick={() => deleteTemplate(selectedTemplate.id)}
-                  >
-                    Delete
-                  </button>
+                  <button className="edit-button" onClick={editTemplate}>Edit</button>
+                  <button className="delete-button" onClick={() => deleteTemplate(selectedTemplate.id)}>Delete</button>
                 </div>
               </div>
 
               <div className="questions-section">
                 <div className="questions-heading">
-                  <div>
-                    <p className="section-label">Report Configuration</p>
-                    <h3>Questions</h3>
-                  </div>
-
+                  <div><p className="section-label">Report Configuration</p><h3>Questions</h3></div>
                   <button
                     className="primary-button"
                     onClick={() => {
@@ -529,16 +418,7 @@ function App() {
                       setQuestionType("");
                       setQuestionRequired(0);
                       setAddingNewSection(false);
-
-                      const nextOrder =
-                        questions.length > 0
-                          ? Math.max(
-                              ...questions.map(question =>
-                                Number(question.display_order)
-                              )
-                            ) + 1
-                          : 1;
-
+                      const nextOrder = questions.length > 0 ? Math.max(...questions.map(question => Number(question.display_order))) + 1 : 1;
                       setQuestionOrder(nextOrder);
                       setShowQuestionForm(true);
                     }}
@@ -551,19 +431,11 @@ function App() {
                   <div className="question-form-panel">
                     <p className="section-label">Question Management</p>
                     <h3>{editingQuestionId ? "Edit Question" : "Add Question"}</h3>
-
                     <form onSubmit={saveQuestion}>
                       <div className="form-group">
                         <label>Section Name</label>
-
                         {sectionNames.length === 0 || addingNewSection ? (
-                          <input
-                            type="text"
-                            value={questionSection}
-                            placeholder="Enter section name"
-                            onChange={event => setQuestionSection(event.target.value)}
-                            required
-                          />
+                          <input type="text" value={questionSection} placeholder="Enter section name" onChange={event => setQuestionSection(event.target.value)} required />
                         ) : (
                           <select
                             value={questionSection}
@@ -578,13 +450,7 @@ function App() {
                             required
                           >
                             <option value="">Select Section</option>
-
-                            {sectionNames.map(section => (
-                              <option key={section} value={section}>
-                                {section}
-                              </option>
-                            ))}
-
+                            {sectionNames.map(section => <option key={section} value={section}>{section}</option>)}
                             <option value="new-section">+ New Section</option>
                           </select>
                         )}
@@ -592,20 +458,12 @@ function App() {
 
                       <div className="form-group">
                         <label>Question</label>
-                        <textarea
-                          value={questionText}
-                          onChange={event => setQuestionText(event.target.value)}
-                          required
-                        />
+                        <textarea value={questionText} onChange={event => setQuestionText(event.target.value)} required />
                       </div>
 
                       <div className="form-group">
                         <label>Question Type</label>
-                        <select
-                          value={questionType}
-                          onChange={event => setQuestionType(event.target.value)}
-                          required
-                        >
+                        <select value={questionType} onChange={event => setQuestionType(event.target.value)} required>
                           <option value="">Select Type</option>
                           <option value="text">Text</option>
                           <option value="textarea">Long Text</option>
@@ -616,10 +474,7 @@ function App() {
 
                       <div className="form-group">
                         <label>Required</label>
-                        <select
-                          value={questionRequired}
-                          onChange={event => setQuestionRequired(Number(event.target.value))}
-                        >
+                        <select value={questionRequired} onChange={event => setQuestionRequired(Number(event.target.value))}>
                           <option value={0}>No</option>
                           <option value={1}>Yes</option>
                         </select>
@@ -627,18 +482,11 @@ function App() {
 
                       <div className="form-group">
                         <label>Display Order</label>
-                        <input
-                          type="number"
-                          value={questionOrder}
-                          onChange={event => setQuestionOrder(event.target.value)}
-                        />
+                        <input type="number" value={questionOrder} onChange={event => setQuestionOrder(event.target.value)} />
                       </div>
 
                       <div className="action-buttons">
-                        <button type="submit" className="primary-button">
-                          {editingQuestionId ? "Update Question" : "Save Question"}
-                        </button>
-
+                        <button type="submit" className="primary-button">{editingQuestionId ? "Update Question" : "Save Question"}</button>
                         <button
                           type="button"
                           className="delete-button"
@@ -660,33 +508,15 @@ function App() {
                   </div>
                 ) : (
                   <div className="question-table">
-                    <div className="question-table-header">
-                      <span>Question</span>
-                      <span>Section</span>
-                      <span>Type</span>
-                      <span>Actions</span>
-                    </div>
-
+                    <div className="question-table-header"><span>Question</span><span>Section</span><span>Type</span><span>Actions</span></div>
                     {questions.map(question => (
                       <div className="question-row" key={question.id}>
                         <span className="question-text">{question.question_text}</span>
                         <span>{question.section_name}</span>
                         <span>{question.question_type}</span>
-
                         <span className="row-actions">
-                          <button
-                            className="text-button"
-                            onClick={() => editQuestion(question)}
-                          >
-                            Edit
-                          </button>
-
-                          <button
-                            className="text-button delete-text"
-                            onClick={() => deleteQuestion(question.id)}
-                          >
-                            Delete
-                          </button>
+                          <button className="text-button" onClick={() => editQuestion(question)}>Edit</button>
+                          <button className="text-button delete-text" onClick={() => deleteQuestion(question.id)}>Delete</button>
                         </span>
                       </div>
                     ))}
@@ -697,9 +527,7 @@ function App() {
           ) : (
             <div className="empty-state">
               <h2>Select a Report Template</h2>
-              <p>
-                Choose a report template from the left to view its information and questions.
-              </p>
+              <p>Choose a report template from the left to view its information and questions.</p>
             </div>
           )}
         </section>
