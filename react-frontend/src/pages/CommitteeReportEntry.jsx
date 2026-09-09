@@ -1668,9 +1668,9 @@ function CommitteeReportEntry({ onBack, onHome, currentUserId }) {
                     <label>
                       Reporting Month <span>*</span>
                     </label>
-                    <select disabled value={reportDetails.submittedByUserId}
-                      onChange={event =>updateReportDetails("reportingMonth", event.target.value)}
-                      required
+                    <select disabled={isReadOnly}
+                      value={reportDetails.reportingMonth}
+                      onChange={event => updateReportDetails("reportingMonth", event.target.value)}
                     >
                       <option value="">Select Month</option>
                       {months.map(month => (
@@ -1706,7 +1706,7 @@ function CommitteeReportEntry({ onBack, onHome, currentUserId }) {
                     <label>
                       Submitted By <span>*</span>
                     </label>
-                    <select disabled={isReadOnly}
+                    <select disabled
                       value={reportDetails.submittedByUserId}
                       onChange={event =>
                         updateReportDetails("submittedByUserId", event.target.value)
