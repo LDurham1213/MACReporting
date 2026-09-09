@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request, send_file
@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from db import get_db_session
-from models import Committee, Report, ReportStatusHistory, User
+from models import Committee, Report, ReportStatusHistory, User, UserRole
 from pdf_services.pdf_service import generate_report_pdf
 
 reports_bp = Blueprint("reports", __name__)
@@ -225,66 +225,41 @@ def get_approvals():
     user_id = request.args.get("user_id", type=int)
     if not user_id:
         return jsonify({"error": "user_id is required"}), 400
-    with get_db_connection() as connection:
-        user = connection.execute(
-            """
-            SELECT
-                user_id,
-                f_name AS first_name,
-                l_name AS last_name
-            FROM users
-            WHERE user_id = %s
-              AND active = TRUE
-            """,
-            (user_id,)
-        ).fetchone()
-        if not user:
-            return jsonify({
-                "error": "Active user not found"
-            }), 404
-        approvals = connection.execute(
-            """
-            SELECT DISTINCT
-                r.report_id,
-                r.report_title,
-                r.rept_temp_id AS report_template_id,
-                r.rept_temp_vsn AS report_template_version,
-                r.committee_id,
-                c.committee_name,
-                c.reviewer_role,
-                r.create_by_uid AS created_by_user_id,
-                creator.f_name AS first_name,
-                creator.l_name AS last_name,
-                r.reporting_period,
-                r.event_dt AS event_date,
-                r.status,
-                r.locked,
-                r.create_dt AS created_at,
-                r.upd_dt AS updated_at
-            FROM reports r
-            JOIN committees c
-              ON c.committee_id = r.committee_id
-            JOIN users creator
-              ON creator.user_id = r.create_by_uid
-            JOIN user_roles ur
-              ON ur.role = c.reviewer_role
-             AND ur.user_id = %s
-             AND ur.active = TRUE
-             AND ur.eff_start_dt <= CURRENT_DATE
-             AND (
-                 ur.eff_end_dt IS NULL
-                 OR ur.eff_end_dt >= CURRENT_DATE
-             )
-            WHERE r.status = 'submitted'
-              AND r.locked = FALSE
-            ORDER BY r.upd_dt DESC, r.report_id DESC
-            """,
-            (user_id,)
-        ).fetchall()
-    return jsonify({
-        "user": user,
-        "approvals": approvals
-    }), 200
+    today = date.today()
+    with get_db_session() as session:
+        user = session.get(User, user_id)
+        if not user or not user.active:
+            return jsonify({"error": "Active user not found"}), 404
+        approvals = session.execute(
+            select(Report, Committee, User)
+            .join(Committee, Committee.committee_id == Report.committee_id)
+            .join(User, User.user_id == Report.create_by_uid)
+            .join(
+                UserRole,
+                (UserRole.role == Committee.reviewer_role)
+                & (UserRole.user_id == user_id)
+                & (UserRole.active.is_(True))
+                & (UserRole.eff_start_dt <= today)
+                & ((UserRole.eff_end_dt.is_(None)) | (UserRole.eff_end_dt >= today))
+            )
+            .where(Report.status == "submitted", Report.locked.is_(False))
+            .distinct()
+            .order_by(Report.upd_dt.desc(), Report.report_id.desc())
+        ).all()
+        approval_rows = []
+        for report, committee, creator in approvals:
+            row = api_row(report)
+            row.update({
+                "committee_name": committee.committee_name,
+                "reviewer_role": committee.reviewer_role,
+                "first_name": creator.f_name,
+                "last_name": creator.l_name,
+            })
+            approval_rows.append(row)
+        return jsonify({
+            "user": {"user_id": user.user_id, "first_name": user.f_name, "last_name": user.l_name},
+            "approvals": approval_rows
+        }), 200
 
 # =========================================================
 # REPORTS AWAITING LOCK
@@ -294,341 +269,145 @@ def get_reports_awaiting_lock():
     user_id = request.args.get("user_id", type=int)
     if not user_id:
         return jsonify({"error": "user_id is required"}), 400
-    with get_db_connection() as connection:
-        user = connection.execute(
-            """
-            SELECT
-                user_id,
-                f_name AS first_name,
-                l_name AS last_name
-            FROM users
-            WHERE user_id = %s
-              AND active = TRUE
-            """,
-            (user_id,)
-        ).fetchone()
-        if not user:
-            return jsonify({
-                "error": "Active user not found"
-            }), 404
-        lock_role = connection.execute(
-            """
-            SELECT role
-            FROM user_roles
-            WHERE user_id = %s
-              AND role IN (
-                  'president',
-                  'technology_chair',
-                  'technology_admin'
-              )
-              AND active = TRUE
-              AND eff_start_dt <= CURRENT_DATE
-              AND (
-                  eff_end_dt IS NULL
-                  OR eff_end_dt >= CURRENT_DATE
-              )
-            LIMIT 1
-            """,
-            (user_id,)
-        ).fetchone()
+    today = date.today()
+    lock_roles = ("president", "technology_chair", "technology_admin")
+    with get_db_session() as session:
+        user = session.get(User, user_id)
+        if not user or not user.active:
+            return jsonify({"error": "Active user not found"}), 404
+        lock_role = session.scalar(
+            select(UserRole).where(
+                UserRole.user_id == user_id,
+                UserRole.role.in_(lock_roles),
+                UserRole.active.is_(True),
+                UserRole.eff_start_dt <= today,
+                (UserRole.eff_end_dt.is_(None)) | (UserRole.eff_end_dt >= today)
+            ).limit(1)
+        )
+        user_data = {"user_id": user.user_id, "first_name": user.f_name, "last_name": user.l_name}
         if not lock_role:
-            return jsonify({
-                "user": user,
-                "can_finalize": False,
-                "awaiting_lock": []
-            }), 200
-        awaiting_lock = connection.execute(
-            """
-            SELECT
-                r.report_id,
-                r.report_title,
-                r.rept_temp_id AS report_template_id,
-                r.rept_temp_vsn AS report_template_version,
-                r.committee_id,
-                c.committee_name,
-                r.create_by_uid AS created_by_user_id,
-                creator.f_name AS first_name,
-                creator.l_name AS last_name,
-                r.reporting_period,
-                r.event_dt AS event_date,
-                r.status,
-                r.locked,
-                r.create_dt AS created_at,
-                r.upd_dt AS updated_at
-            FROM reports r
-            JOIN committees c
-              ON c.committee_id = r.committee_id
-            JOIN users creator
-              ON creator.user_id = r.create_by_uid
-            WHERE r.status = 'approved'
-              AND r.locked = FALSE
-            ORDER BY r.upd_dt DESC, r.report_id DESC
-            """
-        ).fetchall()
-    return jsonify({
-        "user": user,
-        "can_finalize": True,
-        "awaiting_lock": awaiting_lock
-    }), 200
+            return jsonify({"user": user_data, "can_finalize": False, "awaiting_lock": []}), 200
+        reports = session.execute(
+            select(Report, Committee, User)
+            .join(Committee, Committee.committee_id == Report.committee_id)
+            .join(User, User.user_id == Report.create_by_uid)
+            .where(Report.status == "approved", Report.locked.is_(False))
+            .order_by(Report.upd_dt.desc(), Report.report_id.desc())
+        ).all()
+        awaiting_lock = []
+        for report, committee, creator in reports:
+            row = api_row(report)
+            row.update({
+                "committee_name": committee.committee_name,
+                "first_name": creator.f_name,
+                "last_name": creator.l_name,
+            })
+            awaiting_lock.append(row)
+        return jsonify({"user": user_data, "can_finalize": True, "awaiting_lock": awaiting_lock}), 200
 
 # =========================================================
 # REPORT STATUS HISTORY
 # =========================================================
-@reports_bp.route(
-    "/reports/<int:report_id>/status-history",
-methods=["GET"]
-)
+@reports_bp.route("/reports/<int:report_id>/status-history", methods=["GET"])
 def get_report_status_history(report_id):
-    with get_db_connection() as connection:
-        report = connection.execute(
-            """
-            SELECT report_id
-            FROM reports
-            WHERE report_id = %s
-            """,
-            (report_id,)
-        ).fetchone()
-        if not report:
-            return jsonify({
-                "error": "Report not found"
-            }), 404
-        history = connection.execute(
-            """
-            SELECT
-                rsh.report_id,
-                rsh.from_status,
-                rsh.to_status,
-                rsh.chgd_by_uid AS changed_by_user_id,
-                u.f_name AS first_name,
-                u.l_name AS last_name,
-                rsh.chgd_at AS changed_at,
-                rsh.comments
-            FROM report_status_history rsh
-            JOIN users u
-              ON u.user_id = rsh.chgd_by_uid
-            WHERE rsh.report_id = %s
-            ORDER BY rsh.chgd_at DESC
-            """,
-            (report_id,)
-        ).fetchall()
-    return jsonify(history), 200
+    with get_db_session() as session:
+        if not session.get(Report, report_id):
+            return jsonify({"error": "Report not found"}), 404
+        history_rows = session.execute(
+            select(ReportStatusHistory, User)
+            .join(User, User.user_id == ReportStatusHistory.chgd_by_uid)
+            .where(ReportStatusHistory.report_id == report_id)
+            .order_by(ReportStatusHistory.chgd_at.desc())
+        ).all()
+        history = []
+        for status_history, user in history_rows:
+            row = api_row(status_history)
+            row.update({"first_name": user.f_name, "last_name": user.l_name})
+            history.append(row)
+        return jsonify(history), 200
 
 # =========================================================
 # REPORT REVIEW / APPROVAL
 # =========================================================
-def get_reviewer_error(
-connection,
-report_id,
-acting_user_id
-):
+def get_reviewer_error(session, report_id, acting_user_id):
     if not acting_user_id:
-        return jsonify({
-            "error": "changed_by_user_id is required"
-        }), 400
-    report = connection.execute(
-        """
-        SELECT
-            r.report_id,
-            r.status,
-            r.locked,
-            c.reviewer_role
-        FROM reports r
-        JOIN committees c
-          ON c.committee_id = r.committee_id
-        WHERE r.report_id = %s
-        """,
-        (report_id,)
-    ).fetchone()
+        return jsonify({"error": "changed_by_user_id is required"}), 400
+    report = session.get(Report, report_id)
     if not report:
-        return jsonify({
-            "error": "Report not found"
-        }), 404
-    if report["locked"]:
-        return jsonify({
-            "error": "Locked reports cannot be reviewed"
-        }), 409
-    if not report["reviewer_role"]:
-        return jsonify({
-            "error": (
-                "No reviewer role is configured "
-                "for this report's committee"
-            )
-        }), 409
-    authorized_role = connection.execute(
-        """
-        SELECT 1
-        FROM user_roles
-        WHERE user_id = %s
-          AND role = %s
-          AND active = TRUE
-          AND eff_start_dt <= CURRENT_DATE
-          AND (
-              eff_end_dt IS NULL
-              OR eff_end_dt >= CURRENT_DATE
-          )
-        LIMIT 1
-        """,
-        (
-acting_user_id,
-            report["reviewer_role"]
-        )
-    ).fetchone()
+        return jsonify({"error": "Report not found"}), 404
+    if report.locked:
+        return jsonify({"error": "Locked reports cannot be reviewed"}), 409
+    committee = session.get(Committee, report.committee_id)
+    if not committee or not committee.reviewer_role:
+        return jsonify({"error": "No reviewer role is configured for this report's committee"}), 409
+    today = date.today()
+    authorized_role = session.scalar(
+        select(UserRole).where(
+            UserRole.user_id == acting_user_id,
+            UserRole.role == committee.reviewer_role,
+            UserRole.active.is_(True),
+            UserRole.eff_start_dt <= today,
+            (UserRole.eff_end_dt.is_(None)) | (UserRole.eff_end_dt >= today)
+        ).limit(1)
+    )
     if not authorized_role:
-        return jsonify({
-            "error": (
-                "User is not authorized "
-                "to review this report"
-            )
-        }), 403
+        return jsonify({"error": "User is not authorized to review this report"}), 403
     return None
-@reports_bp.route(
-    "/reports/<int:report_id>/return",
-methods=["POST"]
-)
+
+@reports_bp.route("/reports/<int:report_id>/return", methods=["POST"])
 def return_report(report_id):
     data = request.get_json(silent=True) or {}
     changed_by_user_id = data.get("changed_by_user_id")
-    comments = str(
-        data.get("comments") or ""
-    ).strip()
+    comments = str(data.get("comments") or "").strip()
     if not comments:
-        return jsonify({
-            "error": (
-                "A comment is required when returning "
-                "a report for changes"
-            )
-        }), 400
-    with get_db_connection() as connection:
-        reviewer_error = get_reviewer_error(
-            connection,
-report_id,
-            changed_by_user_id
-        )
+        return jsonify({"error": "A comment is required when returning a report for changes"}), 400
+    with get_db_session() as session:
+        reviewer_error = get_reviewer_error(session, report_id, changed_by_user_id)
         if reviewer_error:
             return reviewer_error
-        report = connection.execute(
-            """
-            SELECT status
-            FROM reports
-            WHERE report_id = %s
-            FOR UPDATE
-            """,
-            (report_id,)
-        ).fetchone()
+        report = session.scalar(select(Report).where(Report.report_id == report_id).with_for_update())
         if not report:
-            return jsonify({
-                "error": "Report not found"
-            }), 404
-        if report["status"] != "submitted":
-            return jsonify({
-                "error": (
-                    "Only Submitted reports can be "
-                    "returned for changes"
-                )
-            }), 409
-        updated_report = connection.execute(
-            """
-            UPDATE reports
-            SET status = 'returned_for_changes',
-                upd_dt = CURRENT_TIMESTAMP
-            WHERE report_id = %s
-            RETURNING *
-            """,
-            (report_id,)
-        ).fetchone()
-        connection.execute(
-            """
-            INSERT INTO report_status_history (
-                report_id,
-                from_status,
-                to_status,
-                chgd_by_uid,
-                comments
-            )
-            VALUES (
-                %s,
-                'submitted',
-                'returned_for_changes',
-                %s,
-                %s
-            )
-            """,
-            (
-report_id,
-                changed_by_user_id,
-                comments
-            )
-        )
-    return jsonify(api_row(updated_report)), 200
-@reports_bp.route(
-    "/reports/<int:report_id>/approve",
-methods=["POST"]
-)
+            return jsonify({"error": "Report not found"}), 404
+        if report.status != "submitted":
+            return jsonify({"error": "Only Submitted reports can be returned for changes"}), 409
+        report.status = "returned_for_changes"
+        report.upd_dt = datetime.now(timezone.utc)
+        session.add(ReportStatusHistory(
+            report_id=report_id,
+            from_status="submitted",
+            to_status="returned_for_changes",
+            chgd_by_uid=changed_by_user_id,
+            comments=comments
+        ))
+        session.commit()
+        session.refresh(report)
+        return jsonify(api_row(report)), 200
+
+@reports_bp.route("/reports/<int:report_id>/approve", methods=["POST"])
 def approve_report(report_id):
     data = request.get_json(silent=True) or {}
     changed_by_user_id = data.get("changed_by_user_id")
-    with get_db_connection() as connection:
-        reviewer_error = get_reviewer_error(
-            connection,
-report_id,
-            changed_by_user_id
-        )
+    with get_db_session() as session:
+        reviewer_error = get_reviewer_error(session, report_id, changed_by_user_id)
         if reviewer_error:
             return reviewer_error
-        report = connection.execute(
-            """
-            SELECT status
-            FROM reports
-            WHERE report_id = %s
-            FOR UPDATE
-            """,
-            (report_id,)
-        ).fetchone()
+        report = session.scalar(select(Report).where(Report.report_id == report_id).with_for_update())
         if not report:
-            return jsonify({
-                "error": "Report not found"
-            }), 404
-        if report["status"] != "submitted":
-            return jsonify({
-                "error": (
-                    "Only Submitted reports "
-                    "can be approved"
-                )
-            }), 409
-        updated_report = connection.execute(
-            """
-            UPDATE reports
-            SET status = 'approved',
-                upd_dt = CURRENT_TIMESTAMP
-            WHERE report_id = %s
-            RETURNING *
-            """,
-            (report_id,)
-        ).fetchone()
-        connection.execute(
-            """
-            INSERT INTO report_status_history (
-                report_id,
-                from_status,
-                to_status,
-                chgd_by_uid,
-                comments
-            )
-            VALUES (
-                %s,
-                'submitted',
-                'approved',
-                %s,
-                %s
-            )
-            """,
-            (
-report_id,
-                changed_by_user_id,
-                data.get("comments")
-            )
-        )
-    return jsonify(api_row(updated_report)), 200
+            return jsonify({"error": "Report not found"}), 404
+        if report.status != "submitted":
+            return jsonify({"error": "Only Submitted reports can be approved"}), 409
+        report.status = "approved"
+        report.upd_dt = datetime.now(timezone.utc)
+        session.add(ReportStatusHistory(
+            report_id=report_id,
+            from_status="submitted",
+            to_status="approved",
+            chgd_by_uid=changed_by_user_id,
+            comments=data.get("comments")
+        ))
+        session.commit()
+        session.refresh(report)
+        return jsonify(api_row(report)), 200
 
 # =========================================================
 # REPORT LOCK
