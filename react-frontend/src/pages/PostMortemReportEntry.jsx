@@ -122,6 +122,22 @@ function PostMortemReportEntry({ onBack, onHome, currentUserId }) {
 
   const [canGeneratePdf, setCanGeneratePdf] = useState(false);
 
+  useEffect(() => {
+    if (!currentUserId || reportId) return;
+
+    setReportData(current => {
+      if (current.reportInformation.submittedByUserId) return current;
+
+      return {
+        ...current,
+        reportInformation: {
+          ...current.reportInformation,
+          submittedByUserId: String(currentUserId)
+        }
+      };
+    });
+  }, [currentUserId, reportId]);
+
   const isReadOnly = !["draft", "returned_for_changes"].includes(reportStatus);
   const isReviewerView =
     reportStatus === "submitted" && Boolean(reviewerUserId);
@@ -133,6 +149,10 @@ function PostMortemReportEntry({ onBack, onHome, currentUserId }) {
     : isLockView
       ? [...baseSections, "Finalization Action"]
       : baseSections;
+
+  const currentUser = users.find(user => String(user.user_id) === String(currentUserId));
+  const currentUserName = currentUser ? `${currentUser.first_name || ""} ${currentUser.last_name || ""}`.trim() : "";
+  const currentUserInitials = currentUser ? `${currentUser.first_name?.[0] || ""}${currentUser.last_name?.[0] || ""}`.toUpperCase() : "";
 
   const reviewer = users.find(
     user => String(user.user_id) === String(reviewerUserId)
@@ -1183,14 +1203,10 @@ function PostMortemReportEntry({ onBack, onHome, currentUserId }) {
           </button>
 
           <div className="user-summary">
-            <span className="user-avatar">
-              LD
-            </span>
-
-            <span>Leigh D.</span>
-
+            <span className="user-avatar">{currentUserInitials || "—"}</span>
+            <span>{currentUserName || "Current User"}</span>
             <FaChevronDown />
-          </div>
+          </div>      
 
           <div className="report-status">
             <span>
@@ -1365,7 +1381,7 @@ function PostMortemReportEntry({ onBack, onHome, currentUserId }) {
                     </label>
 
                     <select
-                      disabled={isReadOnly}
+                      disabled
                       value={
                         reportInformation.submittedByUserId
                       }

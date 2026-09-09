@@ -151,6 +151,23 @@ function CommitteeReportEntry({ onBack, onHome, currentUserId }) {
   const [lockError, setLockError] = useState("");
 
   const [canGeneratePdf, setCanGeneratePdf] = useState(false);
+
+  useEffect(() => {
+    if (!currentUserId || reportId) return;
+
+    setReportData(current => {
+      if (current.reportDetails.submittedByUserId) return current;
+
+      return {
+        ...current,
+        reportDetails: {
+          ...current.reportDetails,
+          submittedByUserId: String(currentUserId)
+        }
+      };
+    });
+  }, [currentUserId, reportId]);
+
   const isReadOnly = !["draft", "returned_for_changes"].includes(reportStatus);
   const isReviewerView = reportStatus === "submitted" && Boolean(reviewerUserId);
   const isLockView = reportStatus === "approved" && Boolean(lockUserId);
@@ -159,6 +176,9 @@ function CommitteeReportEntry({ onBack, onHome, currentUserId }) {
     : isLockView
       ? [...baseSections, "Finalization Action"]
       : baseSections;
+  const currentUser = users.find(user => String(user.user_id) === String(currentUserId));
+  const currentUserName = currentUser ? `${currentUser.first_name || ""} ${currentUser.last_name || ""}`.trim() : "";
+  const currentUserInitials = currentUser ? `${currentUser.first_name?.[0] || ""}${currentUser.last_name?.[0] || ""}`.toUpperCase() : "";
   const reviewer = users.find(
     user => String(user.user_id) === String(reviewerUserId)
   );
@@ -1529,12 +1549,8 @@ function CommitteeReportEntry({ onBack, onHome, currentUserId }) {
           </button>
 
           <div className="user-summary">
-            <span className="user-avatar">
-              LD
-            </span>
-
-            <span>Leigh D.</span>
-
+            <span className="user-avatar">{currentUserInitials || "—"}</span>
+            <span>{currentUserName || "Current User"}</span>
             <FaChevronDown />
           </div>
 
@@ -1652,11 +1668,8 @@ function CommitteeReportEntry({ onBack, onHome, currentUserId }) {
                     <label>
                       Reporting Month <span>*</span>
                     </label>
-                    <select disabled={isReadOnly}
-                      value={reportDetails.reportingMonth}
-                      onChange={event =>
-                        updateReportDetails("reportingMonth", event.target.value)
-                      }
+                    <select disabled value={reportDetails.submittedByUserId}
+                      onChange={event =>updateReportDetails("reportingMonth", event.target.value)}
                       required
                     >
                       <option value="">Select Month</option>
