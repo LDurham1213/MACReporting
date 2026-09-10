@@ -138,31 +138,39 @@ function Approvals({ currentUserId, onHome, onOpenReport, onOpenLockReport, onLo
   }
 
   function ReportTable({ reports, emptyMessage, showGeneratePdf = false }) {
-    return (
-      <div className="reports-table">
-        <div className="reports-table-header"><span>Report Title</span><span>Committee</span><span>Period</span><span>Status</span><span>Action</span></div>
-
-        {reports.length === 0 ? (
-          <div className="reports-empty-row">{emptyMessage}</div>
-        ) : reports.map(report => (
-          <div className="reports-table-row" key={report.report_id}>
-            <span>{report.report_title}</span>
-            <span>{report.committee_name}</span>
-            <span>{formatPeriod(report.reporting_period)}</span>
-            <span><span className={`status-badge ${report.status}`}>{displayStatus(report.status)}</span></span>
-            <span className="report-actions">
-              <button title="View report" onClick={() => openReport(report)}><FaEye /></button>
-              {showGeneratePdf && canGeneratePdf && (
-                <button title="Generate PDF" onClick={() => generatePdf(report)} disabled={generatingReportId === report.report_id}>
-                  <FaFilePdf />
-                </button>
-              )}
-            </span>
-          </div>
-        ))}
+  return (
+    <div className={`reports-table ${showGeneratePdf ? "locked-reports-table" : ""}`}>
+      <div className="reports-table-header">
+        <span>Report Title</span>
+        {showGeneratePdf && <span>Report Type</span>}
+        <span>Committee</span>
+        <span>Period</span>
+        <span>Status</span>
+        <span>Action</span>
       </div>
-    );
-  }
+
+      {reports.length === 0 ? (
+        <div className="reports-empty-row">{emptyMessage}</div>
+      ) : reports.map(report => (
+        <div className="reports-table-row" key={report.report_id}>
+          <span>{report.report_title}</span>
+          {showGeneratePdf && <span>{report.report_template_name || report.template_name || "Report"}</span>}
+          <span>{report.committee_name}</span>
+          <span>{formatPeriod(report.reporting_period)}</span>
+          <span><span className={`status-badge ${report.status}`}>{displayStatus(report.status)}</span></span>
+          <span className="report-actions">
+            <button title="View report" onClick={() => openReport(report)}><FaEye /></button>
+            {showGeneratePdf && canGeneratePdf && (
+              <button title="Generate PDF" onClick={() => generatePdf(report)} disabled={generatingReportId === report.report_id}>
+                <FaFilePdf />
+              </button>
+            )}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
   return (
     <div className="home-layout">

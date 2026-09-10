@@ -79,6 +79,7 @@ def get_reports():
                 Report.report_id, Report.report_title,
                 Report.rept_temp_id.label("report_template_id"),
                 Report.rept_temp_vsn.label("report_template_version"),
+                ReportTemplate.name.label("report_template_name"),
                 Report.committee_id, Committee.committee_name,
                 Report.create_by_uid.label("created_by_user_id"),
                 User.f_name.label("first_name"), User.l_name.label("last_name"),
@@ -88,6 +89,7 @@ def get_reports():
             )
             .join(Committee, Committee.committee_id == Report.committee_id)
             .join(User, User.user_id == Report.create_by_uid)
+            .join(ReportTemplate, ReportTemplate.report_template_id == Report.rept_temp_id)
         )
         if report_template_id is not None:
             statement = statement.where(Report.rept_temp_id == report_template_id)

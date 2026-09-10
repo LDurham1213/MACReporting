@@ -278,7 +278,9 @@ function App() {
   if (currentPage === "user-select") return <UserSelect onSelectUser={selectCurrentUser} />;
 
   if (currentPage === "home") {
-    return <Home onSelectReportType={selectReportType} onApprovals={goToApprovals} onLogout={logout} />;
+    return <Home currentUserId={currentUserId} 
+      onSelectReportType={selectReportType} 
+      onApprovals={goToApprovals} onLogout={logout} />;
   }
 
   if (currentPage === "report-options") {
@@ -313,6 +315,7 @@ function App() {
         onBack={goToReportOptions}
         onHome={goHome}
         onApprovals={goToApprovals}
+        onLogout={logout}
       />
     );
   }
@@ -324,6 +327,7 @@ function App() {
         onBack={goToReportOptions}
         onHome={goHome}
         onApprovals={goToApprovals}
+        onLogout={logout}
       />
     );
   }

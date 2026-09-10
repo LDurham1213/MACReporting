@@ -1,7 +1,19 @@
+import { useEffect, useState } from "react";
 import { FaHome, FaFileAlt, FaClipboardList, FaSearch, FaChartBar, FaQuestionCircle, FaSignOutAlt, FaCalendarAlt, FaClipboardCheck } from "react-icons/fa";
 import macLogo from "../assets/MAC_LOGO.png";
 
-function Home({ onSelectReportType, onApprovals, onLogout }) {
+function Home({ currentUserId, onSelectReportType, onApprovals, onLogout }) {
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    fetch("http://localhost:5001/users")
+      .then(response => response.json())
+      .then(users => setCurrentUser(users.find(user => String(user.user_id) === String(currentUserId)) || null))
+      .catch(error => console.error("Unable to load current user:", error));
+  }, [currentUserId]);
+
+  const firstName = currentUser?.first_name || "";
+
   return (
     <div className="home-layout">
       <aside className="sidebar">
@@ -14,7 +26,6 @@ function Home({ onSelectReportType, onApprovals, onLogout }) {
           <button className="nav-item active"><span><FaHome /></span>Home</button>
           <button className="nav-item"><span><FaFileAlt /></span>My Reports</button>
           <button className="nav-item" onClick={onApprovals}><span><FaClipboardCheck /></span>Approvals</button>
-          <button className="nav-item"><span><FaClipboardList /></span>Templates</button>
           <button className="nav-item"><span><FaSearch /></span>Reports (Search)</button>
           <button className="nav-item"><span><FaChartBar /></span>Dashboard (Phase 2)</button>
         </nav>
@@ -28,7 +39,7 @@ function Home({ onSelectReportType, onApprovals, onLogout }) {
       <main className="home-main">
         <section className="home-welcome">
           <h2>Welcome to MACReporting!</h2>
-          <p>What would you like to do today?</p>
+          <p>What would you like to do today{firstName ? `, ${firstName}` : ""}?</p>
         </section>
 
         <section className="report-card-grid">

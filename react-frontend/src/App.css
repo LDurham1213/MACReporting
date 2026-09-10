@@ -288,6 +288,12 @@
   grid-template-columns: minmax(0, 2.3fr) minmax(105px, 1fr) minmax(110px, 1fr) minmax(135px, 1.2fr) minmax(95px, 0.8fr);
   align-items: stretch;
 }
+
+.locked-reports-table .reports-table-header,
+.locked-reports-table .reports-table-row {
+  grid-template-columns: minmax(0, 2fr) minmax(130px, 1.2fr) minmax(105px, 1fr) minmax(110px, 1fr) minmax(135px, 1.2fr) minmax(95px, 0.8fr);
+}
+
 .reports-table-header > span,
 .reports-table-row > span {
   display: flex;

@@ -8,7 +8,8 @@ import {
   FaPlus,
   FaTrash,
   FaHome,
-  FaArrowLeft
+  FaArrowLeft,
+  FaSignOutAlt
 } from "react-icons/fa";
 
 const API_BASE = "http://127.0.0.1:5001";
@@ -124,7 +125,7 @@ const initialReportData = {
   ]
 };
 
-function CommitteeReportEntry({ onBack, onHome, currentUserId }) {
+function CommitteeReportEntry({ onBack, onHome, onLogout, currentUserId }) {
   const [reportId, setReportId] = useState(null);
   const [reportStatus, setReportStatus] = useState("draft");
   const [statusHistory, setStatusHistory] = useState([]);
@@ -1547,6 +1548,11 @@ function CommitteeReportEntry({ onBack, onHome, currentUserId }) {
             <FaHome />
             <span>Home</span>
           </button>
+
+        <button type="button" className="entry-home-button" onClick={onLogout}>
+          <FaSignOutAlt />
+          <span>Log Out</span>
+        </button>
 
           <div className="user-summary">
             <span className="user-avatar">{currentUserInitials || "—"}</span>

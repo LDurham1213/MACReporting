@@ -6,7 +6,8 @@ import {
   FaCheckCircle,
   FaChevronDown,
   FaCircle,
-  FaHome
+  FaHome,
+  FaSignOutAlt
 } from "react-icons/fa";
 
 const API_BASE = "http://127.0.0.1:5001";
@@ -92,7 +93,7 @@ const initialReportData = {
   committeeFeedback: ""
 };
 
-function PostMortemReportEntry({ onBack, onHome, currentUserId }) {
+function PostMortemReportEntry({ onBack, onHome, onLogout, currentUserId }) {
   const [reportId, setReportId] = useState(null);
   const [reportStatus, setReportStatus] = useState("draft");
   const [reportData, setReportData] = useState(initialReportData);
@@ -1200,6 +1201,11 @@ function PostMortemReportEntry({ onBack, onHome, currentUserId }) {
           >
             <FaHome />
             <span>Home</span>
+          </button>
+
+          <button type="button" className="entry-home-button" onClick={onLogout}>
+            <FaSignOutAlt />
+            <span>Log Out</span>
           </button>
 
           <div className="user-summary">
