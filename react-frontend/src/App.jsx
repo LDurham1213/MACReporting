@@ -7,6 +7,7 @@ import PostMortemReportEntry from "./pages/PostMortemReportEntry";
 import Approvals from "./pages/Approvals";
 import UserSelect from "./pages/UserSelect";
 import "./App.css";
+import MyReports from "./pages/MyReports";
 
 const REPORT_TYPE_STORAGE_KEY = "macreporting_selected_report_type";
 const COMMITTEE_REPORT_STORAGE_KEY = "macreporting_committee_report_id";
@@ -80,6 +81,29 @@ function App() {
     setSelectedReportType(null);
     setCurrentPage("home");
   }
+
+  function goToMyReports() {
+  localStorage.removeItem(REVIEWER_USER_STORAGE_KEY);
+  localStorage.removeItem(LOCK_USER_STORAGE_KEY);
+  setSelectedReportType(null);
+  setCurrentPage("my-reports");
+}
+
+function openMyReport(report) {
+  localStorage.removeItem(REVIEWER_USER_STORAGE_KEY);
+  localStorage.removeItem(LOCK_USER_STORAGE_KEY);
+
+  if (Number(report.report_template_id) === 1) {
+    setSelectedReportType("committee");
+    localStorage.setItem(COMMITTEE_REPORT_STORAGE_KEY, report.report_id);
+    setCurrentPage("committee-entry");
+    return;
+  }
+
+  setSelectedReportType("post-mortem");
+  localStorage.setItem(POSTMORTEM_REPORT_STORAGE_KEY, report.report_id);
+  setCurrentPage("postmortem-entry");
+}
 
   function goToApprovals() {
     setSelectedReportType(null);
@@ -278,9 +302,11 @@ function App() {
   if (currentPage === "user-select") return <UserSelect onSelectUser={selectCurrentUser} />;
 
   if (currentPage === "home") {
-    return <Home currentUserId={currentUserId} 
-      onSelectReportType={selectReportType} 
-      onApprovals={goToApprovals} onLogout={logout} />;
+    return <Home currentUserId={currentUserId} onSelectReportType={selectReportType} onMyReports={goToMyReports} onApprovals={goToApprovals} onLogout={logout} />;
+  }
+
+  if (currentPage === "my-reports") {
+    return <MyReports currentUserId={currentUserId} onHome={goHome} onOpenReport={openMyReport} onApprovals={goToApprovals} onLogout={logout} />;
   }
 
   if (currentPage === "report-options") {

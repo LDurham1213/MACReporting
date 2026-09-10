@@ -1347,3 +1347,8 @@
     width: 100%;
   }
 }
+
+.my-reports-table .reports-table-header,
+.my-reports-table .reports-table-row {
+  grid-template-columns: minmax(0, 2fr) minmax(120px, 1fr) minmax(130px, 1.2fr) minmax(120px, 1fr) minmax(100px, 0.8fr) minmax(70px, 0.5fr);
+}

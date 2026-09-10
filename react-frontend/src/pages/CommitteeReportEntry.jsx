@@ -1083,16 +1083,11 @@ function CommitteeReportEntry({ onBack, onHome, onLogout, currentUserId }) {
           actionResult.value.length
             ? actionResult.value.map(item => ({
                 id: item.action_item_id,
-                actionItem:
-                  item.action_item || "",
-                owner:
-                  item.owner || "",
-                dueDate:
-                  item.due_date || "",
-                status:
-                  item.status || "",
-                notes:
-                  item.notes || ""
+                actionItem: item.action_item || "",
+                owner: item.owner || "",
+                dueDate: item.due_date ? new Date(item.due_date).toISOString().split("T")[0] : "",
+                status: item.status || "",
+                notes: item.notes || ""
               }))
             : initialReportData.actionItems;
       }
@@ -1104,12 +1099,9 @@ function CommitteeReportEntry({ onBack, onHome, onLogout, currentUserId }) {
           dateResult.value.length
             ? dateResult.value.map(item => ({
                 id: item.report_date_id,
-                date:
-                  item.reminder_date || "",
-                item:
-                  item.item_deadline || "",
-                owner:
-                  item.owner || ""
+                date: item.reminder_date ? new Date(item.reminder_date).toISOString().split("T")[0] : "",
+                item: item.item_deadline || "",
+                owner: item.owner || ""
               }))
             : initialReportData.datesToRemember;
       }
