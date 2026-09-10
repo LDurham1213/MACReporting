@@ -1352,3 +1352,421 @@
 .my-reports-table .reports-table-row {
   grid-template-columns: minmax(0, 2fr) minmax(120px, 1fr) minmax(130px, 1.2fr) minmax(120px, 1fr) minmax(100px, 0.8fr) minmax(70px, 0.5fr);
 }
+
+/* =========================================================
+   FINAL RESPONSIVE LAYOUT OVERRIDES
+   Large Display / Laptop / Tablet / Mobile
+   ========================================================= */
+
+/* ---------- BASE FLUID LAYOUT ---------- */
+.home-main,
+.reports-main,
+.entry-content {
+  min-width: 0;
+}
+
+.entry-layout {
+  grid-template-columns: clamp(220px, 18vw, 280px) minmax(0, 1fr);
+}
+
+.entry-content {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.entry-form,
+.section-placeholder {
+  width: min(100%, 1050px);
+  max-width: none;
+}
+
+.structured-section-header,
+.structured-entry-table {
+  width: min(100%, 1180px);
+  max-width: none;
+}
+
+.home-welcome,
+.report-card-grid,
+.draft-notice {
+  width: min(100%, 1000px);
+  max-width: none;
+}
+
+.reports-page-header,
+.report-filters,
+.existing-reports {
+  width: min(100%, 1180px);
+  max-width: none;
+}
+
+.report-preview-paper,
+.report-preview-actions {
+  width: min(100%, 1100px);
+  max-width: none;
+}
+
+/* ---------- LARGE SCREENS / PROJECTORS ---------- */
+@media (min-width: 1440px) {
+  .sidebar {
+    width: clamp(260px, 17vw, 320px);
+    min-width: clamp(260px, 17vw, 320px);
+  }
+
+  .home-main {
+    padding: 72px clamp(60px, 6vw, 120px) 60px;
+  }
+
+  .reports-main {
+    padding: 52px clamp(60px, 6vw, 120px) 60px;
+  }
+
+  .entry-header {
+    padding: 20px clamp(32px, 4vw, 72px);
+  }
+
+  .entry-content {
+    padding: 40px clamp(48px, 5vw, 90px) 56px;
+  }
+
+  .entry-header h1 {
+    font-size: clamp(24px, 1.6vw, 30px);
+  }
+
+  .entry-content h2 {
+    font-size: clamp(22px, 1.5vw, 28px);
+  }
+
+  .entry-form-group label,
+  .entry-form-group input,
+  .entry-form-group select,
+  .entry-form-group textarea {
+    font-size: clamp(14px, 0.95vw, 17px);
+  }
+
+  .entry-form-group input,
+  .entry-form-group select {
+    min-height: 48px;
+  }
+}
+
+/* ---------- STANDARD LAPTOPS ---------- */
+@media (max-width: 1200px) {
+  .sidebar {
+    width: 240px;
+    min-width: 240px;
+    padding: 28px 20px 22px;
+  }
+
+  .chapter-logo {
+    width: 145px;
+  }
+
+  .home-main,
+  .reports-main {
+    padding-left: 38px;
+    padding-right: 38px;
+  }
+
+  .entry-content {
+    padding: 30px 36px 40px;
+  }
+
+  .entry-header {
+    gap: 16px;
+    padding: 16px 24px;
+  }
+
+  .entry-header-right {
+    gap: 16px;
+  }
+
+  .entry-logo {
+    width: 140px;
+  }
+}
+
+/* ---------- TABLETS / SMALL LAPTOPS ---------- */
+@media (max-width: 900px) {
+  .entry-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+
+  .entry-header-left,
+  .entry-header-right {
+    width: 100%;
+  }
+
+  .entry-header-left {
+    flex-wrap: wrap;
+  }
+
+  .entry-header-right {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .entry-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .entry-sections {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: none;
+    border-bottom: 1px solid #d9d9d9;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .entry-sections-label,
+  .entry-legend {
+    display: none;
+  }
+
+  .section-nav-item {
+    width: auto;
+    flex: 0 0 auto;
+    padding: 10px 12px;
+    white-space: nowrap;
+  }
+
+  .entry-content {
+    padding: 28px 24px 40px;
+  }
+
+  .entry-form,
+  .structured-section-header,
+  .structured-entry-table {
+    width: 100%;
+  }
+
+  .home-layout {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    min-width: 100%;
+    min-height: auto;
+    padding: 18px 22px;
+    border-right: none;
+    border-bottom: 1px solid #d9d9d9;
+  }
+
+  .sidebar-brand {
+    margin-bottom: 16px;
+  }
+
+  .chapter-logo {
+    width: 125px;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 8px;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nav-item {
+    width: auto;
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .sidebar-footer {
+    margin-top: 14px;
+  }
+
+  .home-main,
+  .reports-main {
+    padding: 32px 24px 40px;
+  }
+
+  .reports-page-header {
+    flex-direction: column;
+  }
+
+  .reports-table,
+  .structured-entry-table,
+  .preview-table-wrap,
+  .review-table {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ---------- PHONES ---------- */
+@media (max-width: 650px) {
+  .entry-header {
+    padding: 12px 16px;
+  }
+
+  .entry-header-left {
+    gap: 10px;
+  }
+
+  .entry-logo {
+    width: 100px;
+  }
+
+  .entry-report-title {
+    flex: 1;
+    min-width: 140px;
+  }
+
+  .entry-header h1 {
+    font-size: 20px;
+  }
+
+  .entry-header p {
+    font-size: 13px;
+  }
+
+  .entry-header-right {
+    gap: 10px;
+  }
+
+  .entry-home-button {
+    padding: 8px 10px;
+  }
+
+  .user-summary {
+    font-size: 13px;
+  }
+
+  .report-status {
+    font-size: 13px;
+  }
+
+  .entry-content {
+    padding: 24px 16px 32px;
+  }
+
+  .entry-content h2 {
+    font-size: 20px;
+  }
+
+  .entry-form-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .entry-form-actions,
+  .reviewer-action-buttons,
+  .report-preview-actions {
+    flex-direction: column;
+  }
+
+  .secondary-action-button,
+  .primary-action-button,
+  .reviewer-action-buttons button,
+  .report-preview-actions button,
+  .add-row-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .structured-section-header {
+    flex-direction: column;
+  }
+
+  .home-main,
+  .reports-main {
+    padding: 26px 16px 34px;
+  }
+
+  .home-welcome h2 {
+    font-size: 26px;
+  }
+
+  .home-welcome p {
+    font-size: 17px;
+  }
+
+  .report-card-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .report-selection-card {
+    min-height: auto;
+    padding: 26px 20px;
+  }
+
+  .report-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .create-report-button,
+  .filter-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .reports-page-header h2 {
+    font-size: 24px;
+  }
+
+  .review-heading,
+  .report-preview-header {
+    flex-direction: column;
+  }
+
+  .review-grid,
+  .preview-detail-grid,
+  .report-preview-footer,
+  .reviewer-summary-card {
+    grid-template-columns: 1fr;
+  }
+
+  .report-preview-paper {
+    padding: 24px 16px;
+    border-radius: 0;
+  }
+
+  .report-preview-header h1 {
+    font-size: 25px;
+  }
+}
+
+/* ---------- VERY SMALL PHONES ---------- */
+@media (max-width: 420px) {
+  .entry-logo {
+    width: 85px;
+  }
+
+  .entry-header h1 {
+    font-size: 18px;
+  }
+
+  .menu-button {
+    padding: 5px;
+  }
+
+  .entry-content {
+    padding: 20px 12px 28px;
+  }
+
+  .section-nav-item {
+    font-size: 13px;
+  }
+
+  .sidebar {
+    padding: 14px;
+  }
+
+  .home-main,
+  .reports-main {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}

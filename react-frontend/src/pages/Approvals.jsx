@@ -35,11 +35,19 @@ function Approvals({ currentUserId, onHome, onOpenReport, onOpenLockReport, onLo
         if (!reportsResponse.ok) throw new Error(reportsData.error || "Unable to load reports.");
 
         const userId = Number(currentUserId);
+        const draftReports = reportsData.filter(report => report.status === "draft" && Number(report.created_by_user_id) === userId);
         const returnedReports = reportsData.filter(report => report.status === "returned_for_changes" && Number(report.created_by_user_id) === userId);
         const submittedReports = approvalsData.approvals || [];
         const approvedReports = lockData.awaiting_lock || [];
-        const combined = [...returnedReports, ...submittedReports, ...approvedReports];
+
+        const combined = [...draftReports, ...returnedReports, ...submittedReports, ...approvedReports];
         const uniqueReports = Array.from(new Map(combined.map(report => [report.report_id, report])).values());
+
+        uniqueReports.sort((a, b) => {
+          const dateA = new Date(a.updated_at || a.created_at || 0);
+          const dateB = new Date(b.updated_at || b.created_at || 0);
+          return dateB - dateA;
+        });
 
         setAwaitingAction(uniqueReports);
         setLockedReports(reportsData.filter(report => report.locked === true || report.status === "locked"));
@@ -66,6 +74,15 @@ function Approvals({ currentUserId, onHome, onOpenReport, onOpenLockReport, onLo
 
   function displayStatus(status) {
     return (status || "").replaceAll("_", " ").toUpperCase();
+  }
+
+  function getActionTitle(report) {
+    if (report.status === "draft") return "Continue report";
+    if (report.status === "returned_for_changes") return "Edit and resubmit report";
+    if (report.status === "submitted") return "Review report";
+    if (report.status === "approved") return "Finalize report";
+    if (report.status === "locked" || report.locked) return "View report";
+    return "Open report";
   }
 
   function openReport(report) {
@@ -138,39 +155,37 @@ function Approvals({ currentUserId, onHome, onOpenReport, onOpenLockReport, onLo
   }
 
   function ReportTable({ reports, emptyMessage, showGeneratePdf = false }) {
-  return (
-    <div className={`reports-table ${showGeneratePdf ? "locked-reports-table" : ""}`}>
-      <div className="reports-table-header">
-        <span>Report Title</span>
-        {showGeneratePdf && <span>Report Type</span>}
-        <span>Committee</span>
-        <span>Period</span>
-        <span>Status</span>
-        <span>Action</span>
-      </div>
-
-      {reports.length === 0 ? (
-        <div className="reports-empty-row">{emptyMessage}</div>
-      ) : reports.map(report => (
-        <div className="reports-table-row" key={report.report_id}>
-          <span>{report.report_title}</span>
-          {showGeneratePdf && <span>{report.report_template_name || report.template_name || "Report"}</span>}
-          <span>{report.committee_name}</span>
-          <span>{formatPeriod(report.reporting_period)}</span>
-          <span><span className={`status-badge ${report.status}`}>{displayStatus(report.status)}</span></span>
-          <span className="report-actions">
-            <button title="View report" onClick={() => openReport(report)}><FaEye /></button>
-            {showGeneratePdf && canGeneratePdf && (
-              <button title="Generate PDF" onClick={() => generatePdf(report)} disabled={generatingReportId === report.report_id}>
-                <FaFilePdf />
-              </button>
-            )}
-          </span>
+    return (
+      <div className={`reports-table ${showGeneratePdf ? "locked-reports-table" : ""}`}>
+        <div className="reports-table-header">
+          <span>Report Title</span>
+          {showGeneratePdf && <span>Report Type</span>}
+          <span>Committee</span>
+          <span>Period</span>
+          <span>Status</span>
+          <span>Action</span>
         </div>
-      ))}
-    </div>
-  );
-}
+
+        {reports.length === 0 ? (
+          <div className="reports-empty-row">{emptyMessage}</div>
+        ) : reports.map(report => (
+          <div className="reports-table-row" key={report.report_id}>
+            <span>{report.report_title}</span>
+            {showGeneratePdf && <span>{report.report_template_name || report.template_name || "Report"}</span>}
+            <span>{report.committee_name}</span>
+            <span>{formatPeriod(report.reporting_period)}</span>
+            <span><span className={`status-badge ${report.status}`}>{displayStatus(report.status)}</span></span>
+            <span className="report-actions">
+              <button title={getActionTitle(report)} aria-label={getActionTitle(report)} onClick={() => openReport(report)}><FaEye /></button>
+              {showGeneratePdf && canGeneratePdf && (
+                <button title="Generate PDF" aria-label="Generate PDF" onClick={() => generatePdf(report)} disabled={generatingReportId === report.report_id}><FaFilePdf /></button>
+              )}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="home-layout">
