@@ -25,33 +25,33 @@ const baseSections = [
   "Review"
 ];
 
-const questionMap = {
-  reportDate: { questionId: 15, version: 1 },
-  submittedBy: { questionId: 16, version: 1 },
-  activityName: { questionId: 17, version: 1 },
-  dateTime: { questionId: 18, version: 1 },
-  location: { questionId: 19, version: 1 },
-  partnerships: { questionId: 20, version: 1 },
-  programThrust: { questionId: 7, version: 1 },
-  objective: { questionId: 21, version: 1 },
-  programRationale: { questionId: 22, version: 1 },
-  communityAttendance: { questionId: 23, version: 1 },
-  chapterAttendance: { questionId: 24, version: 1 },
-  totalAttendance: { questionId: 25, version: 1 },
-  grantsExternalFunding: { questionId: 26, version: 1 },
-  chapterExpenses: { questionId: 27, version: 1 },
-  internalCommitteePartnerships: { questionId: 28, version: 1 },
-  keyMetrics: { questionId: 29, version: 1 },
-  volunteerHours: { questionId: 40, version: 1 },
-  evaluations: { questionId: 30, version: 1 },
-  socialMedia: { questionId: 31, version: 1 },
-  resultsOutcomes: { questionId: 32, version: 1 },
-  externalCoveragePr: { questionId: 33, version: 1 },
-  eventStrengthsSuccesses: { questionId: 34, version: 1 },
-  lessonsLearned: { questionId: 35, version: 1 },
-  keyRecommendations: { questionId: 36, version: 1 },
-  participantFeedback: { questionId: 37, version: 1 },
-  committeeFeedback: { questionId: 38, version: 1 }
+const questionCodeMap = {
+  reportDate: "REPORT_DATE",
+  submittedBy: "SUBMITTED_BY",
+  activityName: "POSTMORTEM_ACTIVITY_NAME",
+  dateTime: "POSTMORTEM_DATE_TIME",
+  location: "POSTMORTEM_LOCATION",
+  partnerships: "PARTNERSHIPS",
+  programThrust: "PROGRAM_THRUST",
+  objective: "OBJECTIVE",
+  programRationale: "PROGRAM_RATIONALE",
+  communityAttendance: "COMMUNITY_ATTENDANCE",
+  chapterAttendance: "CHAPTER_ATTENDANCE",
+  totalAttendance: "TOTAL_ATTENDANCE",
+  grantsExternalFunding: "GRANTS_EXTERNAL_FUNDING",
+  chapterExpenses: "CHAPTER_EXPENSES",
+  internalCommitteePartnerships: "INTERNAL_COMMITTEE_PARTNERSHIPS",
+  keyMetrics: "KEY_METRICS",
+  volunteerHours: "VOLUNTEER_HOURS",
+  evaluations: "EVALUATIONS",
+  socialMedia: "SOCIAL_MEDIA",
+  resultsOutcomes: "RESULTS_OUTCOMES",
+  externalCoveragePr: "EXTERNAL_COVERAGE_PR",
+  eventStrengthsSuccesses: "EVENT_STRENGTHS_SUCCESSES",
+  lessonsLearned: "LESSONS_LEARNED",
+  keyRecommendations: "KEY_RECOMMENDATIONS",
+  participantFeedback: "PARTICIPANT_FEEDBACK",
+  committeeFeedback: "COMMITTEE_FEEDBACK"
 };
 
 const initialReportData = {
@@ -106,6 +106,7 @@ function PostMortemReportEntry({ onBack, onHome, onLogout, currentUserId }) {
   const [users, setUsers] = useState([]);
   const [committees, setCommittees] = useState([]);
   const [statusHistory, setStatusHistory] = useState([]);
+  const [questionMap, setQuestionMap] = useState({});
 
   const [reviewerUserId] = useState(
     () => localStorage.getItem(REVIEWER_USER_STORAGE_KEY) || ""
@@ -194,18 +195,31 @@ function PostMortemReportEntry({ onBack, onHome, onLogout, currentUserId }) {
   useEffect(() => {
     async function initializeReport() {
       try {
-        const [userData, committeeData] = await Promise.all([
+        const [userData, committeeData, templateQuestions] = await Promise.all([
           apiRequest("/users"),
-          apiRequest("/committees")
+          apiRequest("/committees"),
+          apiRequest("/report-templates/2/questions")
         ]);
 
         setUsers(userData);
         setCommittees(committeeData);
 
+        const resolvedQuestionMap = {};
+        Object.entries(questionCodeMap).forEach(([fieldName, questionCode]) => {
+          const question = templateQuestions.find(item => item.question_code === questionCode);
+          if (question) {
+            resolvedQuestionMap[fieldName] = {
+              questionId: question.id,
+              version: question.question_version || question.version || 1
+            };
+          }
+        });
+        setQuestionMap(resolvedQuestionMap);
+
         const storedReportId = localStorage.getItem(REPORT_STORAGE_KEY);
 
         if (storedReportId) {
-          await loadDraft(Number(storedReportId));
+          await loadDraft(Number(storedReportId), resolvedQuestionMap);
         } else {
           setLoadingDraft(false);
         }
@@ -362,6 +376,25 @@ function PostMortemReportEntry({ onBack, onHome, onLogout, currentUserId }) {
     return user
       ? `${user.first_name || ""} ${user.last_name || ""}`.trim()
       : "";
+  }
+
+  function inputDate(value) {
+    if (!value) return "";
+    const stringValue = String(value);
+    if (/^\d{4}-\d{2}-\d{2}/.test(stringValue)) return stringValue.slice(0, 10);
+    const date = new Date(stringValue);
+    return Number.isNaN(date.getTime()) ? "" : date.toISOString().split("T")[0];
+  }
+
+  function inputDateTime(value) {
+    if (!value) return "";
+    const stringValue = String(value);
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(stringValue)) return stringValue.slice(0, 16);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(stringValue)) return `${stringValue}T10:00`;
+    const date = new Date(stringValue);
+    if (Number.isNaN(date.getTime())) return "";
+    const pad = number => String(number).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   }
 
   function getReportingPeriod() {
@@ -581,7 +614,7 @@ function PostMortemReportEntry({ onBack, onHome, onLogout, currentUserId }) {
     );
   }
 
-  async function loadDraft(id) {
+  async function loadDraft(id, resolvedQuestionMap = questionMap) {
     setLoadingDraft(true);
 
     try {
@@ -596,115 +629,58 @@ function PostMortemReportEntry({ onBack, onHome, onLogout, currentUserId }) {
       setStatusHistory(history);
 
       const answerValues = {};
+      const questionFieldsById = {};
+
+      Object.entries(resolvedQuestionMap).forEach(([fieldName, question]) => {
+        questionFieldsById[String(question.questionId)] = fieldName;
+      });
 
       answers.forEach(answer => {
-        answerValues[answer.question_id] =
-          answer.answer_value ?? "";
+        const fieldName = questionFieldsById[String(answer.question_id)];
+        if (fieldName) answerValues[fieldName] = answer.answer_value ?? "";
       });
 
       setReportId(id);
       setReportStatus(report.status || "draft");
-
-      localStorage.setItem(
-        REPORT_STORAGE_KEY,
-        id
-      );
+      localStorage.setItem(REPORT_STORAGE_KEY, id);
 
       setReportData({
         reportInformation: {
-          reportDate:
-            answerValues[15] ||
-            report.reporting_period ||
-            "",
-          submittedByUserId:
-            String(
-              report.created_by_user_id ||
-              ""
-            ),
-          committeeId:
-            String(
-              report.committee_id ||
-              ""
-            )
+          reportDate: inputDate(answerValues.reportDate || report.reporting_period),
+          submittedByUserId: String(report.created_by_user_id || ""),
+          committeeId: String(report.committee_id || "")
         },
         eventLogistics: {
-          activityName:
-            answerValues[17] ||
-            report.report_title ||
-            "",
-          dateTime:
-            answerValues[18] ||
-            "",
-          location:
-            answerValues[19] ||
-            "",
-          partnerships:
-            answerValues[20] ||
-            ""
+          activityName: answerValues.activityName || report.report_title || "",
+          dateTime: inputDateTime(answerValues.dateTime || report.event_date),
+          location: answerValues.location || "",
+          partnerships: answerValues.partnerships || ""
         },
         goalsObjective: {
-          programThrust:
-            answerValues[7] ||
-            "",
-          objective:
-            answerValues[21] ||
-            "",
-          programRationale:
-            answerValues[22] ||
-            "",
-          communityAttendance:
-            answerValues[23] ||
-            "",
-          chapterAttendance:
-            answerValues[24] ||
-            ""
+          programThrust: answerValues.programThrust || "",
+          objective: answerValues.objective || "",
+          programRationale: answerValues.programRationale || "",
+          communityAttendance: answerValues.communityAttendance || "",
+          chapterAttendance: answerValues.chapterAttendance || ""
         },
         financialInformation: {
-          grantsExternalFunding:
-            answerValues[26] ||
-            "",
-          chapterExpenses:
-            answerValues[27] ||
-            ""
+          grantsExternalFunding: answerValues.grantsExternalFunding || "",
+          chapterExpenses: answerValues.chapterExpenses || ""
         },
         outcomeMetrics: {
-          internalCommitteePartnerships:
-            answerValues[28] ||
-            "",
-          keyMetrics:
-            answerValues[29] ||
-            "",
-          volunteerHours:
-            answerValues[40] ||
-            "",
-          evaluations:
-            answerValues[30] ||
-            "",
-          socialMedia:
-            answerValues[31] ||
-            "",
-          resultsOutcomes:
-            answerValues[32] ||
-            "",
-          externalCoveragePr:
-            answerValues[33] ||
-            "",
-          eventStrengthsSuccesses:
-            answerValues[34] ||
-            "",
-          lessonsLearned:
-            answerValues[35] ||
-            "",
-          keyRecommendations:
-            answerValues[36] ||
-            "",
-          participantFeedback:
-            answerValues[37] ||
-            ""
+          internalCommitteePartnerships: answerValues.internalCommitteePartnerships || "",
+          keyMetrics: answerValues.keyMetrics || "",
+          volunteerHours: answerValues.volunteerHours || "",
+          evaluations: answerValues.evaluations || "",
+          socialMedia: answerValues.socialMedia || "",
+          resultsOutcomes: answerValues.resultsOutcomes || "",
+          externalCoveragePr: answerValues.externalCoveragePr || "",
+          eventStrengthsSuccesses: answerValues.eventStrengthsSuccesses || "",
+          lessonsLearned: answerValues.lessonsLearned || "",
+          keyRecommendations: answerValues.keyRecommendations || "",
+          participantFeedback: answerValues.participantFeedback || ""
         },
-        committeeFeedback:
-          answerValues[38] ||
-          ""
+        committeeFeedback: answerValues.committeeFeedback || ""
       });
 
       setCompletedSections(

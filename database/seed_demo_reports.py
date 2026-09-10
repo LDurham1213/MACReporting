@@ -158,6 +158,8 @@ def answer_for_question(question, version, report_type, index, creator, committe
         return f"{200 + index * 25:.2f}"
     if qtype == "checkbox":
         return "true"
+    if code == "PROGRAM_THRUST":
+        return "Educational Development"
     if qtype == "dropdown":
         if "STATUS" in code or "STATUS" in text:
             return "Completed"
