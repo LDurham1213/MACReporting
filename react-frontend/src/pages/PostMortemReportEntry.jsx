@@ -1146,7 +1146,7 @@ function PostMortemReportEntry({ onBack, onHome, onLogout, currentUserId }) {
                   onClick={handleBack}
                 >
                   <FaArrowLeft />
-                  <span>Reports</span>
+                  <span>Back</span>
                 </button>
               </div>
             )}

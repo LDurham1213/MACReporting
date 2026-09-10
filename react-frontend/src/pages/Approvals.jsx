@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import macLogo from "../assets/MAC_LOGO.png";
-import { FaHome, FaFileAlt, FaClipboardCheck, FaEye, FaFilePdf, FaQuestionCircle, FaSignOutAlt } from "react-icons/fa";
+import { FaHome, FaClipboardCheck, FaEye, FaFilePdf, FaQuestionCircle, FaSignOutAlt } from "react-icons/fa";
 
 const API_BASE = "http://127.0.0.1:5001";
 
@@ -194,7 +194,7 @@ function Approvals({ currentUserId, onHome, onOpenReport, onOpenLockReport, onLo
 
         <nav className="sidebar-nav">
           <button className="nav-item" onClick={onHome}><span><FaHome /></span>Home</button>
-          <button className="nav-item"><span><FaFileAlt /></span>Reports</button>
+          {/* <button className="nav-item"><span><FaFileAlt /></span>Reports</button> */}
           <button className="nav-item active"><span><FaClipboardCheck /></span>Approvals</button>
         </nav>
 
