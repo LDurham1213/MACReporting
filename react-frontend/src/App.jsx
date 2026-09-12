@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import ReportTemplate from "./components/ReportTemplate";
 import Home from "./pages/Home";
 import ReportOptions from "./pages/ReportOptions";
+import ReportsSearch from "./pages/ReportsSearch";
 import CommitteeReportEntry from "./pages/CommitteeReportEntry";
 import PostMortemReportEntry from "./pages/PostMortemReportEntry";
 import Approvals from "./pages/Approvals";
 import UserSelect from "./pages/UserSelect";
-import "./App.css";
 import MyReports from "./pages/MyReports";
+import "./App.css";
 
 const REPORT_TYPE_STORAGE_KEY = "macreporting_selected_report_type";
 const COMMITTEE_REPORT_STORAGE_KEY = "macreporting_committee_report_id";
@@ -83,27 +84,49 @@ function App() {
   }
 
   function goToMyReports() {
-  localStorage.removeItem(REVIEWER_USER_STORAGE_KEY);
-  localStorage.removeItem(LOCK_USER_STORAGE_KEY);
-  setSelectedReportType(null);
-  setCurrentPage("my-reports");
-}
-
-function openMyReport(report) {
-  localStorage.removeItem(REVIEWER_USER_STORAGE_KEY);
-  localStorage.removeItem(LOCK_USER_STORAGE_KEY);
-
-  if (Number(report.report_template_id) === 1) {
-    setSelectedReportType("committee");
-    localStorage.setItem(COMMITTEE_REPORT_STORAGE_KEY, report.report_id);
-    setCurrentPage("committee-entry");
-    return;
+    localStorage.removeItem(REVIEWER_USER_STORAGE_KEY);
+    localStorage.removeItem(LOCK_USER_STORAGE_KEY);
+    setSelectedReportType(null);
+    setCurrentPage("my-reports");
   }
 
-  setSelectedReportType("post-mortem");
-  localStorage.setItem(POSTMORTEM_REPORT_STORAGE_KEY, report.report_id);
-  setCurrentPage("postmortem-entry");
-}
+  function goToReportsSearch() {
+    localStorage.removeItem(REVIEWER_USER_STORAGE_KEY);
+    localStorage.removeItem(LOCK_USER_STORAGE_KEY);
+    setCurrentPage("reports-search");
+  }
+
+  function openMyReport(report) {
+    localStorage.removeItem(REVIEWER_USER_STORAGE_KEY);
+    localStorage.removeItem(LOCK_USER_STORAGE_KEY);
+
+    if (Number(report.report_template_id) === 1) {
+      setSelectedReportType("committee");
+      localStorage.setItem(COMMITTEE_REPORT_STORAGE_KEY, report.report_id);
+      setCurrentPage("committee-entry");
+      return;
+    }
+
+    setSelectedReportType("post-mortem");
+    localStorage.setItem(POSTMORTEM_REPORT_STORAGE_KEY, report.report_id);
+    setCurrentPage("postmortem-entry");
+  }
+
+  function openSearchReport(report) {
+    localStorage.removeItem(REVIEWER_USER_STORAGE_KEY);
+    localStorage.removeItem(LOCK_USER_STORAGE_KEY);
+
+    if (Number(report.report_template_id) === 1) {
+      setSelectedReportType("committee");
+      localStorage.setItem(COMMITTEE_REPORT_STORAGE_KEY, report.report_id);
+      setCurrentPage("committee-entry");
+      return;
+    }
+
+    setSelectedReportType("post-mortem");
+    localStorage.setItem(POSTMORTEM_REPORT_STORAGE_KEY, report.report_id);
+    setCurrentPage("postmortem-entry");
+  }
 
   function goToApprovals() {
     setSelectedReportType(null);
@@ -302,7 +325,7 @@ function openMyReport(report) {
   if (currentPage === "user-select") return <UserSelect onSelectUser={selectCurrentUser} />;
 
   if (currentPage === "home") {
-    return <Home currentUserId={currentUserId} onSelectReportType={selectReportType} onMyReports={goToMyReports} onApprovals={goToApprovals} onLogout={logout} />;
+    return <Home currentUserId={currentUserId} onSelectReportType={selectReportType} onMyReports={goToMyReports} onApprovals={goToApprovals} onReportsSearch={goToReportsSearch} onLogout={logout} />;
   }
 
   if (currentPage === "my-reports") {
@@ -316,7 +339,19 @@ function openMyReport(report) {
         onCreateNew={createNewReport}
         onOpenExisting={openExistingReport}
         onBack={goHome}
+        onReportsSearch={goToReportsSearch}
         onApprovals={goToApprovals}
+        onLogout={logout}
+      />
+    );
+  }
+
+  if (currentPage === "reports-search") {
+    return (
+      <ReportsSearch
+        onHome={goHome}
+        onReports={goToReportOptions}
+        onOpenReport={openSearchReport}
         onLogout={logout}
       />
     );
@@ -371,11 +406,13 @@ function openMyReport(report) {
       <main className="dashboard">
         <aside className="template-panel">
           <div className="panel-heading"><h2>Report Templates</h2><span>{reportTemplates.length}</span></div>
+
           <div className="template-list">
             {reportTemplates.map(template => (
               <ReportTemplate key={template.id} template={template} selected={selectedTemplate?.id === template.id} onViewQuestions={loadQuestions} />
             ))}
           </div>
+
           <button
             className="primary-button"
             onClick={() => {
@@ -396,15 +433,18 @@ function openMyReport(report) {
             <div className="template-form-panel">
               <p className="section-label">Template Management</p>
               <h2>{editingTemplateId ? "Edit Report Template" : "Add Report Template"}</h2>
+
               <form onSubmit={saveTemplate}>
                 <div className="form-group">
                   <label>Name</label>
                   <input type="text" value={templateName} onChange={event => setTemplateName(event.target.value)} required />
                 </div>
+
                 <div className="form-group">
                   <label>Description</label>
                   <input type="text" value={templateDescription} onChange={event => setTemplateDescription(event.target.value)} />
                 </div>
+
                 <div className="action-buttons">
                   <button type="submit" className="primary-button">{editingTemplateId ? "Update Template" : "Save Template"}</button>
                   <button
@@ -430,6 +470,7 @@ function openMyReport(report) {
                   <h2>{selectedTemplate.name}</h2>
                   <p>{selectedTemplate.description}</p>
                 </div>
+
                 <div className="action-buttons">
                   <button className="edit-button" onClick={editTemplate}>Edit</button>
                   <button className="delete-button" onClick={() => deleteTemplate(selectedTemplate.id)}>Delete</button>
@@ -439,6 +480,7 @@ function openMyReport(report) {
               <div className="questions-section">
                 <div className="questions-heading">
                   <div><p className="section-label">Report Configuration</p><h3>Questions</h3></div>
+
                   <button
                     className="primary-button"
                     onClick={() => {
@@ -461,9 +503,11 @@ function openMyReport(report) {
                   <div className="question-form-panel">
                     <p className="section-label">Question Management</p>
                     <h3>{editingQuestionId ? "Edit Question" : "Add Question"}</h3>
+
                     <form onSubmit={saveQuestion}>
                       <div className="form-group">
                         <label>Section Name</label>
+
                         {sectionNames.length === 0 || addingNewSection ? (
                           <input type="text" value={questionSection} placeholder="Enter section name" onChange={event => setQuestionSection(event.target.value)} required />
                         ) : (
@@ -539,6 +583,7 @@ function openMyReport(report) {
                 ) : (
                   <div className="question-table">
                     <div className="question-table-header"><span>Question</span><span>Section</span><span>Type</span><span>Actions</span></div>
+
                     {questions.map(question => (
                       <div className="question-row" key={question.id}>
                         <span className="question-text">{question.question_text}</span>
