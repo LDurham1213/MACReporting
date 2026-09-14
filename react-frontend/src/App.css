@@ -603,10 +603,11 @@
 }
 .entry-form-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 14px;
   margin-top: 4px;
 }
+
 .secondary-action-button,
 .primary-action-button {
   padding: 13px 22px;
@@ -1769,4 +1770,19 @@
     padding-left: 12px;
     padding-right: 12px;
   }
+}
+
+.structured-section-actions {
+  justify-content: flex-start;
+}
+
+.attachment-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.attachment-item {
+  margin-bottom: 18px;
 }

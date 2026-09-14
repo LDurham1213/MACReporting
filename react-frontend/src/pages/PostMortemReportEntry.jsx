@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import macLogo from "../assets/MAC_LOGO.png";
+import AttachmentSection from "../components/AttachmentSection";
 import {
   FaArrowLeft,
   FaBars,
@@ -22,6 +23,7 @@ const baseSections = [
   "Financial Information / Metrics",
   "Outcome / Metrics",
   "Committee Feedback",
+  "Attachments",
   "Review"
 ];
 
@@ -747,15 +749,23 @@ function PostMortemReportEntry({ onBack, onHome, onLogout, currentUserId }) {
       const nextSection = {
         "Report Information":
           "Event Logistics",
+
         "Event Logistics":
           "Goals / Objective",
+
         "Goals / Objective":
           "Financial Information / Metrics",
+
         "Financial Information / Metrics":
           "Outcome / Metrics",
+
         "Outcome / Metrics":
           "Committee Feedback",
+
         "Committee Feedback":
+          "Attachments",
+
+        "Attachments":
           "Review"
       };
 
@@ -2156,6 +2166,28 @@ function PostMortemReportEntry({ onBack, onHome, onLogout, currentUserId }) {
 
                 {formActions()}
               </form>
+            </>
+          )}
+
+          {currentSection === "Attachments" && (
+            <>
+              <AttachmentSection
+                reportId={reportId}
+                currentUserId={currentUserId}
+                isReadOnly={isReadOnly}
+              />
+
+              {!isReadOnly && (
+                <div className="form-actions">
+                  <button
+                    type="button"
+                    className="primary-action-button"
+                    onClick={() => setCurrentSection("Review")}
+                  >
+                    Continue to Review →
+                  </button>
+                </div>
+              )}
             </>
           )}
 

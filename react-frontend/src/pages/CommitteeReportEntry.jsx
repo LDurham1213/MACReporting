@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import AttachmentSection from "../components/AttachmentSection";
 import macLogo from "../assets/MAC_LOGO.png";
 import {
   FaBars,
@@ -28,6 +29,7 @@ const baseSections = [
   "Action Items",
   "Dates to Remember",
   "Budget",
+  "Attachments",
   "Review"
 ];
 
@@ -1270,6 +1272,9 @@ function CommitteeReportEntry({ onBack, onHome, onLogout, currentUserId }) {
           "Budget",
 
         "Budget":
+          "Attachments",
+
+        "Attachments":
           "Review"
       };
 
@@ -2464,7 +2469,7 @@ function CommitteeReportEntry({ onBack, onHome, onLogout, currentUserId }) {
                 )}
               </div>
 
-              <div className="entry-form-actions">
+              <div className="entry-form-actions structured-section-actions">
                 <button
                   type="button"
                   className="secondary-action-button"
@@ -2491,9 +2496,7 @@ function CommitteeReportEntry({ onBack, onHome, onLogout, currentUserId }) {
             <>
               <div className="structured-section-header">
                 <div>
-                  <h2>
-                    DATES TO REMEMBER
-                  </h2>
+                  <h2>DATES TO REMEMBER</h2>
                   <p>
                     Add important dates,
                     deadlines, and
@@ -2504,9 +2507,7 @@ function CommitteeReportEntry({ onBack, onHome, onLogout, currentUserId }) {
                 <button
                   type="button"
                   className="add-row-button"
-                  onClick={
-                    addDateToRemember
-                  }
+                  onClick={addDateToRemember}
                   disabled={isReadOnly}
                 >
                   <FaPlus />
@@ -2591,7 +2592,7 @@ function CommitteeReportEntry({ onBack, onHome, onLogout, currentUserId }) {
                 )}
               </div>
 
-              <div className="entry-form-actions">
+              <div className="entry-form-actions structured-section-actions">
                 <button
                   type="button"
                   className="secondary-action-button"
@@ -2604,9 +2605,7 @@ function CommitteeReportEntry({ onBack, onHome, onLogout, currentUserId }) {
                 <button
                   type="button"
                   className="primary-action-button"
-                  onClick={
-                    handleSaveAndContinue
-                  }
+                  onClick={handleSaveAndContinue}
                   disabled={isReadOnly}
                 >
                   Save & Continue →
@@ -2765,7 +2764,7 @@ function CommitteeReportEntry({ onBack, onHome, onLogout, currentUserId }) {
                 </div>
               </div>
 
-              <div className="entry-form-actions">
+              <div className="entry-form-actions structured-section-actions">
                 <button
                   type="button"
                   className="secondary-action-button"
@@ -2783,9 +2782,30 @@ function CommitteeReportEntry({ onBack, onHome, onLogout, currentUserId }) {
                   }
                   disabled={isReadOnly}
                 >
-                  Save & Review →
+                  Save & Continue →
                 </button>
               </div>
+            </>
+          ) : currentSection ===
+            "Attachments" ? (
+            <>
+              <AttachmentSection
+                reportId={reportId}
+                currentUserId={currentUserId}
+                isReadOnly={isReadOnly}
+              />
+
+              {!isReadOnly && (
+                <div className="entry-form-actions structured-section-actions">
+                  <button
+                    type="button"
+                    className="primary-action-button"
+                    onClick={handleSaveAndContinue}
+                  >
+                    Save & Review →
+                  </button>
+                </div>
+              )}
             </>
           ) : currentSection ===
             "Review" ? (
