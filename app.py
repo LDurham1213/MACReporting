@@ -6,6 +6,7 @@ from routes.questions import questions_bp
 from routes.reports import reports_bp
 from routes.lookups import lookups_bp
 from routes.attachments import attachments_bp
+from routes.dashboard import dashboard_bp
 
 app = Flask(__name__)
 CORS(app)
@@ -15,6 +16,7 @@ app.register_blueprint(questions_bp)
 app.register_blueprint(reports_bp)
 app.register_blueprint(lookups_bp)
 app.register_blueprint(attachments_bp)
+app.register_blueprint(dashboard_bp)
 
 
 @app.route("/")

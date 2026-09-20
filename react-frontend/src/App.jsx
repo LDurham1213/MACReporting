@@ -8,6 +8,7 @@ import PostMortemReportEntry from "./pages/PostMortemReportEntry";
 import Approvals from "./pages/Approvals";
 import UserSelect from "./pages/UserSelect";
 import MyReports from "./pages/MyReports";
+import Dashboard from "./pages/Dashboard";
 import "./App.css";
 
 const REPORT_TYPE_STORAGE_KEY = "macreporting_selected_report_type";
@@ -81,6 +82,13 @@ function App() {
     localStorage.removeItem(LOCK_USER_STORAGE_KEY);
     setSelectedReportType(null);
     setCurrentPage("home");
+  }
+
+  function goToDashboard() {
+    localStorage.removeItem(REVIEWER_USER_STORAGE_KEY);
+    localStorage.removeItem(LOCK_USER_STORAGE_KEY);
+    setSelectedReportType(null);
+    setCurrentPage("dashboard");
   }
 
   function goToMyReports() {
@@ -325,7 +333,29 @@ function App() {
   if (currentPage === "user-select") return <UserSelect onSelectUser={selectCurrentUser} />;
 
   if (currentPage === "home") {
-    return <Home currentUserId={currentUserId} onSelectReportType={selectReportType} onMyReports={goToMyReports} onApprovals={goToApprovals} onReportsSearch={goToReportsSearch} onLogout={logout} />;
+    return (
+      <Home
+        currentUserId={currentUserId}
+        onSelectReportType={selectReportType}
+        onMyReports={goToMyReports}
+        onApprovals={goToApprovals}
+        onReportsSearch={goToReportsSearch}
+        onDashboard={goToDashboard}
+        onLogout={logout}
+      />
+    );
+  }
+
+  if (currentPage === "dashboard") {
+    return (
+      <Dashboard
+        onHome={goHome}
+        onMyReports={goToMyReports}
+        onApprovals={goToApprovals}
+        onReportsSearch={goToReportsSearch}
+        onLogout={logout}
+      />
+    );
   }
 
   if (currentPage === "my-reports") {

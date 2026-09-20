@@ -23,3 +23,5 @@ pdf_services/generated_pdfs/*
 
 # Environment variables / secrets
 .env
+
+uploads/

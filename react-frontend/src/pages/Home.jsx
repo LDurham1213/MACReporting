@@ -2,7 +2,15 @@ import { useEffect, useState } from "react";
 import { FaHome, FaFileAlt, FaClipboardList, FaSearch, FaChartBar, FaQuestionCircle, FaSignOutAlt, FaCalendarAlt, FaClipboardCheck } from "react-icons/fa";
 import macLogo from "../assets/MAC_LOGO.png";
 
-function Home({ currentUserId, onSelectReportType, onMyReports, onApprovals, onReportsSearch, onLogout }) {
+function Home({
+  currentUserId,
+  onSelectReportType,
+  onMyReports,
+  onApprovals,
+  onReportsSearch,
+  onDashboard,
+  onLogout
+}) {
   const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
@@ -27,7 +35,7 @@ function Home({ currentUserId, onSelectReportType, onMyReports, onApprovals, onR
           <button className="nav-item" onClick={onMyReports}><span><FaFileAlt /></span>My Reports</button>
           <button className="nav-item" onClick={onApprovals}><span><FaClipboardCheck /></span>Approvals</button>
           <button className="nav-item" onClick={onReportsSearch}><span><FaSearch /></span>Reports Search</button>
-          <button className="nav-item"><span><FaChartBar /></span>Dashboard (Phase 2)</button>
+          <button className="nav-item" onClick={onDashboard}><span><FaChartBar /></span>Dashboard (Phase 2)</button>
         </nav>
 
         <div className="sidebar-footer">
