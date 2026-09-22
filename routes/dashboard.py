@@ -128,6 +128,8 @@ def dashboard_committee_activity():
         with get_db_session() as session:
             reporting_period = request.args.get("reporting_period")
             committee_id = request.args.get("committee_id")
+            report_type = request.args.get("report_type")
+            program_event_id = request.args.get("program_event_id")
 
             report_filters = []
 
@@ -139,6 +141,16 @@ def dashboard_committee_activity():
             if committee_id:
                 report_filters.append(
                     Report.committee_id == int(committee_id)
+                )
+
+            if report_type:
+                report_filters.append(
+                    Report.rept_temp_id == int(report_type)
+                )
+
+            if program_event_id:
+                report_filters.append(
+                    Report.report_id == int(program_event_id)
                 )
 
             valid_statuses = [
@@ -324,6 +336,15 @@ def dashboard_filter_options():
                 .order_by(Committee.committee_name)
             ).all()
 
+            program_events = session.scalars(
+                select(Report)
+                .where(
+                    Report.rept_temp_id == 2,
+                    Report.report_title.is_not(None)
+                )
+                .order_by(Report.report_title)
+            ).all()
+
             return jsonify({
                 "reporting_periods": [
                     str(period)
@@ -336,6 +357,23 @@ def dashboard_filter_options():
                         "committee_abbr": committee.comm_abbr
                     }
                     for committee in committees
+                ],
+                "report_types": [
+                    {
+                        "report_type_id": 1,
+                        "report_type_name": "Committee Report"
+                    },
+                    {
+                        "report_type_id": 2,
+                        "report_type_name": "Post-Mortem Report"
+                    }
+                ],
+                "program_events": [
+                    {
+                        "report_id": report.report_id,
+                        "report_title": report.report_title
+                    }
+                    for report in program_events
                 ]
             })
 

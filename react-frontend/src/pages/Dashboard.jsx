@@ -36,7 +36,9 @@ function Dashboard({
 
   const [filterOptions, setFilterOptions] = useState({
     reporting_periods: [],
-    committees: []
+    committees: [],
+    report_types: [],
+    program_events: []
   });
 
   const [
@@ -47,6 +49,16 @@ function Dashboard({
   const [
     selectedCommittee,
     setSelectedCommittee
+  ] = useState("");
+
+  const [
+    selectedReportType,
+    setSelectedReportType
+  ] = useState("");
+
+  const [
+    selectedProgramEvent,
+    setSelectedProgramEvent
   ] = useState("");
 
   function buildDashboardQuery() {
@@ -63,6 +75,20 @@ function Dashboard({
       params.append(
         "committee_id",
         selectedCommittee
+      );
+    }
+
+    if (selectedReportType) {
+      params.append(
+        "report_type",
+        selectedReportType
+      );
+    }
+
+    if (selectedProgramEvent) {
+      params.append(
+        "program_event_id",
+        selectedProgramEvent
       );
     }
 
@@ -153,7 +179,12 @@ function Dashboard({
     loadDashboardSummary();
     loadCommitteeActivity();
     loadReportStatus();
-  }, [selectedReportingPeriod, selectedCommittee]);
+  }, [
+    selectedReportingPeriod,
+    selectedCommittee,
+    selectedReportType,
+    selectedProgramEvent
+  ]);
 
   useEffect(() => {
     async function loadFilterOptions() {
@@ -330,20 +361,65 @@ function Dashboard({
             <div className="dashboard-filter">
               <label>Report Type</label>
 
-              <select>
-                <option>
+              <select
+                value={selectedReportType}
+                onChange={(event) => {
+                  const value = event.target.value;
+
+                  setSelectedReportType(value);
+
+                  if (value === "1") {
+                    setSelectedProgramEvent("");
+                  }
+                }}
+              >
+                <option value="">
                   All Report Types
                 </option>
+
+                {filterOptions.report_types.map(
+                  (reportType) => (
+                    <option
+                      key={reportType.report_type_id}
+                      value={reportType.report_type_id}
+                    >
+                      {reportType.report_type_name}
+                    </option>
+                  )
+                )}
               </select>
             </div>
 
             <div className="dashboard-filter">
               <label>Program / Event</label>
 
-              <select>
-                <option>
+              <select
+                value={selectedProgramEvent}
+                disabled={selectedReportType === "1"}
+                onChange={(event) => {
+                  const value = event.target.value;
+
+                  setSelectedProgramEvent(value);
+
+                  if (value) {
+                    setSelectedReportType("2");
+                  }
+                }}
+              >
+                <option value="">
                   All Programs / Events
                 </option>
+
+                {filterOptions.program_events.map(
+                  (programEvent) => (
+                    <option
+                      key={programEvent.report_id}
+                      value={programEvent.report_id}
+                    >
+                      {programEvent.report_title}
+                    </option>
+                  )
+                )}
               </select>
             </div>
           </div>
