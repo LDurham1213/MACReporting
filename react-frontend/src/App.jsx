@@ -359,7 +359,17 @@ function App() {
   }
 
   if (currentPage === "my-reports") {
-    return <MyReports currentUserId={currentUserId} onHome={goHome} onOpenReport={openMyReport} onApprovals={goToApprovals} onLogout={logout} />;
+    return (
+      <MyReports
+        currentUserId={currentUserId}
+        onHome={goHome}
+        onOpenReport={openMyReport}
+        onApprovals={goToApprovals}
+        onReportsSearch={goToReportsSearch}
+        onDashboard={goToDashboard}
+        onLogout={logout}
+      />
+    );
   }
 
   if (currentPage === "report-options") {
@@ -371,6 +381,7 @@ function App() {
         onBack={goHome}
         onReportsSearch={goToReportsSearch}
         onApprovals={goToApprovals}
+        onDashboard={goToDashboard}
         onLogout={logout}
       />
     );
@@ -381,6 +392,7 @@ function App() {
       <ReportsSearch
         onHome={goHome}
         onReports={goToReportOptions}
+        onDashboard={goToDashboard}
         onOpenReport={openSearchReport}
         onLogout={logout}
       />
@@ -392,6 +404,9 @@ function App() {
       <Approvals
         currentUserId={currentUserId}
         onHome={goHome}
+        onMyReports={goToMyReports}
+        onReportsSearch={goToReportsSearch}
+        onDashboard={goToDashboard}
         onOpenReport={openApprovalReport}
         onOpenLockReport={openLockReport}
         onLogout={logout}

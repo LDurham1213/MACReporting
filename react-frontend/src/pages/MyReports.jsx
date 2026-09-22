@@ -2,7 +2,15 @@ import { useEffect, useState } from "react";
 import { FaHome, FaFileAlt, FaClipboardCheck, FaSearch, FaChartBar, FaQuestionCircle, FaSignOutAlt, FaEye } from "react-icons/fa";
 import macLogo from "../assets/MAC_LOGO.png";
 
-function MyReports({ currentUserId, onHome, onOpenReport, onApprovals, onLogout }) {
+function MyReports({
+  currentUserId,
+  onHome,
+  onOpenReport,
+  onApprovals,
+  onReportsSearch,
+  onDashboard,
+  onLogout
+}) {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -42,8 +50,8 @@ function MyReports({ currentUserId, onHome, onOpenReport, onApprovals, onLogout 
           <button className="nav-item" onClick={onHome}><span><FaHome /></span>Home</button>
           <button className="nav-item active"><span><FaFileAlt /></span>My Reports</button>
           <button className="nav-item" onClick={onApprovals}><span><FaClipboardCheck /></span>Approvals</button>
-          <button className="nav-item"><span><FaSearch /></span>Reports (Search)</button>
-          <button className="nav-item"><span><FaChartBar /></span>Dashboard (Phase 2)</button>
+          <button className="nav-item" onClick={onReportsSearch}><span><FaSearch /></span>Reports Search</button>
+          <button className="nav-item" onClick={onDashboard}><span><FaChartBar /></span>Dashboard</button>
         </nav>
 
         <div className="sidebar-footer">

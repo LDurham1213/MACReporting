@@ -229,7 +229,7 @@ function Dashboard({
 
           <button className="nav-item active">
             <span><FaChartBar /></span>
-            Dashboard (Phase 2)
+            Dashboard
           </button>
         </nav>
 
@@ -494,7 +494,7 @@ function Dashboard({
             </section>
           </div>
 
-          <section className="dashboard-panel">
+          {/* <section className="dashboard-panel">
             <h2>Needs My Attention</h2>
 
             <p>
@@ -508,7 +508,7 @@ function Dashboard({
             <p>
               Recently updated reports will appear here.
             </p>
-          </section>
+          </section> */}
         </section>
       </main>
     </div>

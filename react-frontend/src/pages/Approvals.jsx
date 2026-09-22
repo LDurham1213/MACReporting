@@ -1,10 +1,29 @@
 import { useEffect, useState } from "react";
 import macLogo from "../assets/MAC_LOGO.png";
-import { FaHome, FaClipboardCheck, FaEye, FaFilePdf, FaQuestionCircle, FaSignOutAlt } from "react-icons/fa";
+import {
+  FaHome,
+  FaFileAlt,
+  FaClipboardCheck,
+  FaSearch,
+  FaChartBar,
+  FaEye,
+  FaFilePdf,
+  FaQuestionCircle,
+  FaSignOutAlt
+} from "react-icons/fa";
 
 const API_BASE = "http://127.0.0.1:5001";
 
-function Approvals({ currentUserId, onHome, onOpenReport, onOpenLockReport, onLogout }) {
+function Approvals({
+  currentUserId,
+  onHome,
+  onMyReports,
+  onReportsSearch,
+  onDashboard,
+  onOpenReport,
+  onOpenLockReport,
+  onLogout
+}) {
   const [awaitingAction, setAwaitingAction] = useState([]);
   const [lockedReports, setLockedReports] = useState([]);
   const [canGeneratePdf, setCanGeneratePdf] = useState(false);
@@ -194,8 +213,10 @@ function Approvals({ currentUserId, onHome, onOpenReport, onOpenLockReport, onLo
 
         <nav className="sidebar-nav">
           <button className="nav-item" onClick={onHome}><span><FaHome /></span>Home</button>
-          {/* <button className="nav-item"><span><FaFileAlt /></span>Reports</button> */}
+          <button className="nav-item" onClick={onMyReports}><span><FaFileAlt /></span>My Reports</button>
           <button className="nav-item active"><span><FaClipboardCheck /></span>Approvals</button>
+          <button className="nav-item" onClick={onReportsSearch}><span><FaSearch /></span>Reports Search</button>
+          <button className="nav-item" onClick={onDashboard}><span><FaChartBar /></span>Dashboar</button>
         </nav>
 
         <div className="sidebar-footer">

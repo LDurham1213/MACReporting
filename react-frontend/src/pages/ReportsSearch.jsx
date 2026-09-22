@@ -1,10 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { FaHome, FaFileAlt, FaSearch, FaEye, FaEdit, FaQuestionCircle, FaSignOutAlt } from "react-icons/fa";
+import {
+  FaHome,
+  FaFileAlt,
+  FaSearch,
+  FaChartBar,
+  FaEye,
+  FaEdit,
+  FaQuestionCircle,
+  FaSignOutAlt
+} from "react-icons/fa";
 import macLogo from "../assets/MAC_LOGO.png";
 
 const API_BASE = "http://127.0.0.1:5001";
 
-function ReportsSearch({ onHome, onReports, onOpenReport, onLogout }) {
+function ReportsSearch({ onHome, onReports, onDashboard, onOpenReport, onLogout }) {
   const [reports, setReports] = useState([]);
   const [committees, setCommittees] = useState([]);
   const [searchText, setSearchText] = useState("");
@@ -100,10 +109,10 @@ function ReportsSearch({ onHome, onReports, onOpenReport, onLogout }) {
       <aside className="sidebar">
         <div className="sidebar-brand"><img src={macLogo} alt="MAC Logo" className="chapter-logo" /><h1>MACReporting</h1></div>
 
-        <nav className="sidebar-nav">
-          <button className="nav-item" onClick={onHome}><span><FaHome /></span>Home</button>
+        <nav className="sidebar-nav"><button className="nav-item" onClick={onHome}><span><FaHome /></span>Home</button>
           <button className="nav-item" onClick={onReports}><span><FaFileAlt /></span>Reports</button>
           <button className="nav-item active"><span><FaSearch /></span>Reports Search</button>
+          <button className="nav-item" onClick={onDashboard}><span><FaChartBar /></span>Dashboard</button>
         </nav>
 
         <div className="sidebar-footer">

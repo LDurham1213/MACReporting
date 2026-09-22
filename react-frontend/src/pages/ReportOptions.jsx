@@ -4,7 +4,15 @@ import macLogo from "../assets/MAC_LOGO.png";
 
 const API_BASE = "http://127.0.0.1:5001";
 
-function ReportOptions({ selectedReportType, onCreateNew, onOpenExisting, onBack, onReportsSearch, onLogout }) {
+function ReportOptions({
+  selectedReportType,
+  onCreateNew,
+  onOpenExisting,
+  onBack,
+  onReportsSearch,
+  onDashboard,
+  onLogout
+}) {
   const isCommittee = selectedReportType === "committee";
   const reportName = isCommittee ? "Committee Report" : "Post-Mortem Report";
   const templateId = isCommittee ? 1 : 2;
@@ -77,7 +85,7 @@ function ReportOptions({ selectedReportType, onCreateNew, onOpenExisting, onBack
         <nav className="sidebar-nav">
           <button className="nav-item" onClick={onBack}><span><FaHome /></span>Home</button>
           <button className="nav-item" onClick={onReportsSearch}><span><FaSearch /></span>Reports Search</button>
-          <button className="nav-item"><span><FaChartBar /></span>Dashboard (Phase 2)</button>
+          <button className="nav-item" onClick={onDashboard}><span><FaChartBar /></span>Dashboard</button>
         </nav>
 
         <div className="sidebar-footer">
