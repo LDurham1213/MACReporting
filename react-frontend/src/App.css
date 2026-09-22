@@ -1410,46 +1410,50 @@
 
 /* ---------- LARGE SCREENS / PROJECTORS ---------- */
 @media (min-width: 1440px) {
-  .sidebar {
-    width: clamp(260px, 17vw, 320px);
-    min-width: clamp(260px, 17vw, 320px);
-  }
+  .sidebar {width: clamp(260px, 17vw, 320px);min-width: clamp(260px, 17vw, 320px);}
 
-  .home-main {
-    padding: 72px clamp(60px, 6vw, 120px) 60px;
-  }
-
-  .reports-main {
-    padding: 52px clamp(60px, 6vw, 120px) 60px;
-  }
-
-  .entry-header {
-    padding: 20px clamp(32px, 4vw, 72px);
-  }
-
-  .entry-content {
-    padding: 40px clamp(48px, 5vw, 90px) 56px;
-  }
-
-  .entry-header h1 {
-    font-size: clamp(24px, 1.6vw, 30px);
-  }
-
-  .entry-content h2 {
-    font-size: clamp(22px, 1.5vw, 28px);
-  }
+  .home-main {padding: 72px clamp(60px, 6vw, 120px) 60px;}
+  .reports-main {padding: 52px clamp(60px, 6vw, 120px) 60px;}
+  .entry-header {padding: 20px clamp(32px, 4vw, 72px);}
+  .entry-content {padding: 40px clamp(48px, 5vw, 90px) 56px;}
+  .entry-header h1 {font-size: clamp(24px, 1.6vw, 30px);}
+  .entry-content h2 {font-size: clamp(22px, 1.5vw, 28px);}
 
   .entry-form-group label,
   .entry-form-group input,
   .entry-form-group select,
-  .entry-form-group textarea {
-    font-size: clamp(14px, 0.95vw, 17px);
-  }
-
+  .entry-form-group textarea {font-size: clamp(14px, 0.95vw, 17px);}
   .entry-form-group input,
-  .entry-form-group select {
-    min-height: 48px;
-  }
+  .entry-form-group select {min-height: 48px;}
+    /* Improve readability on large displays and projectors */
+  .sidebar-brand h1 {font-size: 22px;}
+
+  .nav-item {font-size: 16px; padding: 13px 16px;}
+  .nav-item span {font-size: 17px;}
+
+  .reports-page-header h2 {font-size: 30px;}
+  .reports-page-header p {font-size: 16px;}
+  .report-filters label {font-size: 15px;}
+  .report-filters select,
+  .report-filters input {font-size: 15px;min-height: 44px;}
+
+  .existing-reports h3 {font-size: 21px;}
+
+  .reports-table {font-size: 15px;}
+  .reports-table th {font-size: 14px;}
+  .reports-table td {padding-top: 15px; padding-bottom: 15px;}
+
+  .primary-action-button,
+  .secondary-action-button {font-size: 15px;}
+  .dashboard-header h1 {font-size: 30px;}
+  .dashboard-header p {font-size: 16px;}
+  .dashboard-filter label {font-size: 15px;}
+  .dashboard-filter select {font-size: 15px; min-height: 44px;}
+  .dashboard-metric-card span {font-size: 15px;}
+  .dashboard-metric-card strong {font-size: 30px;}
+  .dashboard-panel h2 {font-size: 21px;}
+  .dashboard-table {font-size: 15px;}
+  .dashboard-table th {font-size: 14px;}
 }
 
 /* ---------- STANDARD LAPTOPS ---------- */
